@@ -1,0 +1,262 @@
+html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ProteinFlex - Interactive Protein Visualization</title>
+    <script src="https://3dmol.csb.pitt.edu/build/3Dmol-min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/qa_styles.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/drug_discovery.css') }}">
+</head>
+<body>
+    <header>
+        <h1>ProteinFlex</h1>
+        <div class="controls">
+            <button id="reset-view">Reset View</button>
+            <button id="toggle-surface">Toggle Surface</button>
+            <button id="download-pdb">Download PDB</button>
+        </div>
+    </header>
+    <main>
+        <div id="sidebar">
+            <div class="input-section">
+                <textarea id="sequence-input" placeholder="Enter protein sequence..."></textarea>
+                <button id="predict-button">Predict Structure</button>
+            </div>
+
+            <div class="visualization-controls">
+                <h3>Visualization Controls</h3>
+                <div class="control-group">
+                    <label>Heatmap Type:</label>
+                    <select id="heatmap-select">
+                        <option value="confidence">Confidence Score</option>
+                        <option value="hydrophobicity">Hydrophobicity</option>
+                        <option value="conservation">Conservation</option>
+                        <option value="domains">Domains</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <label>Annotations:</label>
+                    <div class="checkbox-group">
+                        <label>
+                            <input type="checkbox" id="show-domains" checked>
+                            Show Domains
+                        </label>
+                        <label>
+                            <input type="checkbox" id="show-active-sites" checked>
+                            Show Active Sites
+                        </label>
+                        <label>
+                            <input type="checkbox" id="show-binding-sites" checked>
+                            Show Binding Sites
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="qa-section">
+                <h3>Ask Questions</h3>
+                <textarea id="question-input" class="qa-input" placeholder="Ask questions about protein function, stability, or mutations..."></textarea>
+                <button id="ask-button">Ask Question</button>
+                <div id="answer-box" class="answer-box" style="display: none;"></div>
+                <div class="loading-spinner">Analyzing...</div>
+            </div>
+
+            <div class="mutation-analysis">
+                <h3>Mutation Analysis</h3>
+                <div class="mutation-input">
+                    <input type="text" id="mutation-input" placeholder="Enter mutation (e.g., A123B)">
+                    <button id="analyze-mutation">Analyze</button>
+                </div>
+                <div id="mutation-results" class="mutation-results"></div>
+            </div>
+
+            <div id="confidence-score">
+                <h3>Confidence Score</h3>
+                <div class="confidence-bar">
+                    <div class="confidence-fill"></div>
+                </div>
+                <p id="confidence-value">0%</p>
+            </div>
+
+            <div class="drug-discovery-section">
+                <h3>Drug Discovery Tools</h3>
+                <div class="ligand-input">
+                    <textarea id="ligand-input" class="ligand-input" placeholder="Enter ligand SMILES..."></textarea>
+                </div>
+                <div class="button-group">
+                    <button id="analyze-binding-sites">Analyze Binding Sites</button>
+                    <button id="predict-interactions">Predict Interactions</button>
+                    <button id="screen-off-targets">Screen Off-Targets</button>
+                </div>
+                <div id="selected-site"></div>
+                <div id="binding-sites-results" class="results-container"></div>
+                <div id="interaction-results" class="results-container"></div>
+                <div id="off-target-results" class="results-container"></div>
+                <div id="optimization-results" class="results-container"></div>
+                <div class="loading-spinner">Analyzing...</div>
+            </div>
+
+            <div id="domain-analysis">
+                <h3>Domain Analysis</h3>
+                <div id="domain-list"></div>
+            </div>
+
+            <div id="analysis-section">
+                <h3>Analysis Results</h3>
+                <pre id="analysis-results"></pre>
+            </div>
+        </div>
+        <div id="visualization-section">
+            <div id="viewer-container" style="height: 400px; width: 100%; position: relative;"></div>
+            <div id="contact-map" style="height: 300px; width: 100%;"></div>
+        </div>
+    </main>
+    <script src="{{ url_for('static', filename='js/visualization.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/drug_discovery.js') }}"></script>
+    <script>
+        $(document).ready(function() {
+            const proteinVisualizer = new ProteinVisualizer('viewer-container', 'contact-map');
+
+            // Handle heatmap type changes
+            $('#heatmap-select').change(function() {
+                const heatmapType = $(this).val();
+                proteinVisualizer.showHeatmap(heatmapType);
+            });
+
+            // Handle annotation toggles
+            $('.checkbox-group input[type="checkbox"]').change(function() {
+                const annotationType = this.id.replace('show-', '');
+                const isVisible = $(this).prop('checked');
+                proteinVisualizer.toggleAnnotation(annotationType, isVisible);
+            });
+
+            $('#predict-button').click(function() {
+                const sequence = $('#sequence-input').val();
+                if (!sequence) {
+                    alert('Please enter a protein sequence');
+                    return;
+                }
+
+                $.ajax({
+                    url: '/predict',
+                    method: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ sequence: sequence }),
+                    success: function(response) {
+                        proteinVisualizer.visualizeStructure(response.pdb_string, response.confidence_score);
+                        proteinVisualizer.updateContactMap(response.contact_map);
+
+                        // Update confidence score
+                        const confidenceFill = $('.confidence-fill');
+                        confidenceFill.css({
+                            'width': `${response.confidence_score}%`,
+                            'background-color': response.confidence_score > 90 ? '#00ff00' :
+                                           response.confidence_score > 70 ? '#ffff00' :
+                                           response.confidence_score > 50 ? '#ffa500' : '#ff0000'
+                        });
+                        $('#confidence-value').text(`${response.confidence_score.toFixed(1)}%`);
+
+                        // Update domain analysis
+                        if (response.domains) {
+                            const domainList = $('#domain-list');
+                            domainList.empty();
+                            response.domains.forEach(domain => {
+                                domainList.append(`
+                                    <div class="domain-item">
+                                        <span class="domain-type">${domain.type}</span>
+                                        <span class="domain-range">${domain.start}-${domain.end}</span>
+                                    </div>
+                                `);
+                            });
+                        }
+
+                        // Update analysis results
+                        $('#analysis-results').text(response.description);
+                    },
+                    error: function(error) {
+                        console.error('Error:', error);
+                        alert('Error predicting structure. Please try again.');
+                    }
+                });
+            });
+
+            $('#reset-view').click(() => proteinVisualizer.resetView());
+            $('#toggle-surface').click(() => proteinVisualizer.toggleSurface());
+            $('#download-pdb').click(function() {
+                proteinVisualizer.downloadPDB();
+            });
+
+            // Question answering functionality
+            $('#ask-button').click(function() {
+                const sequence = $('#sequence-input').val();
+                const question = $('#question-input').val();
+                if (!sequence || !question) {
+                    alert('Please enter both a sequence and a question');
+                    return;
+                }
+
+                $('.loading-spinner').addClass('active');
+                $('#answer-box').hide();
+
+                $.ajax({
+                    url: '/ask_question',
+                    method: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ sequence: sequence, question: question }),
+                    success: function(response) {
+                        $('.loading-spinner').removeClass('active');
+                        $('#answer-box').html(response.answer).show();
+                    },
+                    error: function(error) {
+                        $('.loading-spinner').removeClass('active');
+                        alert('Error analyzing question. Please try again.');
+                    }
+                });
+            });
+
+            // Mutation analysis functionality
+            $('#analyze-mutation').click(function() {
+                const sequence = $('#sequence-input').val();
+                const mutation = $('#mutation-input').val();
+                if (!sequence || !mutation) {
+                    alert('Please enter both a sequence and a mutation');
+                    return;
+                }
+
+                $.ajax({
+                    url: '/analyze_mutation',
+                    method: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ sequence: sequence, mutation: mutation }),
+                    success: function(response) {
+                        const results = $('#mutation-results');
+                        const impactClass = response.overall_impact > 0.7 ? 'impact-high' :
+                                          response.overall_impact > 0.3 ? 'impact-medium' : 'impact-low';
+
+                        results.html(`
+                            <div class="mutation-item">
+                                <span class="confidence-indicator ${impactClass}"></span>
+                                <strong>Mutation: ${mutation}</strong><br>
+                                Stability Impact: ${(response.stability_impact * 100).toFixed(1)}%<br>
+                                Structural Impact: ${(response.structural_impact * 100).toFixed(1)}%<br>
+                                Functional Impact: ${(response.functional_impact * 100).toFixed(1)}%<br>
+                                Overall Impact: ${(response.overall_impact * 100).toFixed(1)}%<br>
+                                Confidence: ${(response.confidence * 100).toFixed(1)}%
+                            </div>
+                        `);
+                    },
+                    error: function(error) {
+                        alert('Error analyzing mutation. Please try again.');
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

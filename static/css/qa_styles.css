@@ -1,0 +1,94 @@
+/* Styles for Question Answering and Mutation Analysis */
+.qa-section {
+    background-color: white;
+    padding: 1rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-top: 1rem;
+}
+
+.qa-input {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin-bottom: 0.5rem;
+    resize: vertical;
+    min-height: 60px;
+}
+
+.mutation-analysis {
+    background-color: white;
+    padding: 1rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-top: 1rem;
+}
+
+.mutation-input {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.mutation-input input {
+    flex: 1;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.mutation-results {
+    max-height: 300px;
+    overflow-y: auto;
+    padding: 0.5rem;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+}
+
+.mutation-item {
+    padding: 0.5rem;
+    border-bottom: 1px solid #ddd;
+}
+
+.mutation-item:last-child {
+    border-bottom: none;
+}
+
+.confidence-indicator {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 0.5rem;
+}
+
+.impact-high {
+    background-color: #dc3545;
+}
+
+.impact-medium {
+    background-color: #ffc107;
+}
+
+.impact-low {
+    background-color: #28a745;
+}
+
+.answer-box {
+    background-color: #f8f9fa;
+    padding: 1rem;
+    border-radius: 4px;
+    margin-top: 0.5rem;
+    border-left: 4px solid #3498db;
+}
+
+.loading-spinner {
+    display: none;
+    text-align: center;
+    padding: 1rem;
+}
+
+.loading-spinner.active {
+    display: block;
+}
