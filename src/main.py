@@ -4,6 +4,9 @@ from src.data_preprocessing import preprocess_protein_data
 from src.model_training import train_and_evaluate_model
 from src.nlp_processing import process_text
 from src.virtual_screening import virtual_screening
+from rdkit import Chem
+from rdkit.Chem import Descriptors
+
 
 def main():
     # Load protein data
@@ -40,6 +43,7 @@ def main():
     # Perform virtual screening
     scored_compounds = virtual_screening(protein_structure, compounds, criteria)
     print("Scored Compounds:", scored_compounds)
+
 
 if __name__ == "__main__":
     main()

@@ -1,6 +1,6 @@
-import numpy as np
 import tensorflow as tf
 from sklearn.model_selection import train_test_split
+
 
 def build_model(input_shape):
     """
@@ -25,6 +25,7 @@ def build_model(input_shape):
     model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
     return model
 
+
 def train_model(model, X_train, y_train, X_val, y_val, epochs=10, batch_size=32):
     """
     Train the 3D model using the training data.
@@ -44,6 +45,7 @@ def train_model(model, X_train, y_train, X_val, y_val, epochs=10, batch_size=32)
     history = model.fit(X_train, y_train, validation_data=(X_val, y_val), epochs=epochs, batch_size=batch_size)
     return history
 
+
 def evaluate_model(model, X_test, y_test):
     """
     Evaluate the trained model using the test data.
@@ -58,6 +60,7 @@ def evaluate_model(model, X_test, y_test):
     """
     evaluation = model.evaluate(X_test, y_test)
     return dict(zip(model.metrics_names, evaluation))
+
 
 def train_and_evaluate_model(data, labels, test_size=0.2, val_size=0.2, epochs=10, batch_size=32):
     """

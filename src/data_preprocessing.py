@@ -1,10 +1,10 @@
-import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler
 from simtk.openmm.app import PDBFile
 from simtk.openmm.app import ForceField, Simulation
 from simtk.openmm import LangevinIntegrator
 from simtk.unit import kelvin, picoseconds, femtoseconds
+
 
 def clean_data(df):
     """
@@ -20,6 +20,7 @@ def clean_data(df):
     df = df.dropna()
     return df
 
+
 def normalize_data(df):
     """
     Normalize the protein data using standard scaling.
@@ -34,6 +35,7 @@ def normalize_data(df):
     df[df.columns] = scaler.fit_transform(df[df.columns])
     return df
 
+
 def transform_data(df):
     """
     Transform the protein data for model input.
@@ -47,6 +49,7 @@ def transform_data(df):
     # Example transformation: log transformation
     df = df.applymap(lambda x: np.log(x + 1))
     return df
+
 
 def preprocess_protein_data(df):
     """
@@ -63,6 +66,7 @@ def preprocess_protein_data(df):
     df = transform_data(df)
     return df
 
+
 def parse_pdb_file(file_path):
     """
     Parse a PDB file and return the PDB object.
@@ -75,6 +79,7 @@ def parse_pdb_file(file_path):
     """
     pdb = PDBFile(file_path)
     return pdb
+
 
 def create_simulation(pdb):
     """

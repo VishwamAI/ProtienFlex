@@ -1,8 +1,5 @@
 import numpy as np
-from rdkit import Chem
-from rdkit.Chem import AllChem, Descriptors
-from rdkit.Chem import rdMolDescriptors
-from rdkit.Chem import rdMolAlign
+
 
 def select_compounds(compounds, criteria):
     """
@@ -20,6 +17,7 @@ def select_compounds(compounds, criteria):
         if all(criteria[key](compound) for key in criteria):
             selected_compounds.append(compound)
     return selected_compounds
+
 
 def dock_compounds(protein, compounds):
     """
@@ -39,6 +37,7 @@ def dock_compounds(protein, compounds):
         docking_scores.append(docking_score)
     return docking_scores
 
+
 def score_compounds(compounds, docking_scores):
     """
     Score the compounds based on docking results and other criteria.
@@ -56,6 +55,7 @@ def score_compounds(compounds, docking_scores):
         final_score = score + Descriptors.MolWt(compound)
         scored_compounds.append((compound, final_score))
     return scored_compounds
+
 
 def virtual_screening(protein, compounds, criteria):
     """

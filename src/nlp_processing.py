@@ -3,9 +3,11 @@ import nltk
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
 from gensim.models import Word2Vec
+import numpy as np
 
 nltk.download('punkt')
 nltk.download('stopwords')
+
 
 def clean_text(text):
     """
@@ -22,6 +24,7 @@ def clean_text(text):
     text = text.strip()
     return text
 
+
 def tokenize_text(text):
     """
     Tokenize the input text into words.
@@ -34,6 +37,7 @@ def tokenize_text(text):
     """
     tokens = word_tokenize(text)
     return tokens
+
 
 def remove_stopwords(tokens):
     """
@@ -49,6 +53,7 @@ def remove_stopwords(tokens):
     filtered_tokens = [word for word in tokens if word.lower() not in stop_words]
     return filtered_tokens
 
+
 def embed_text(tokens):
     """
     Embed the tokenized words using Word2Vec.
@@ -62,6 +67,7 @@ def embed_text(tokens):
     model = Word2Vec([tokens], min_count=1)
     embeddings = [model.wv[word] for word in tokens]
     return embeddings
+
 
 def process_text(text):
     """
