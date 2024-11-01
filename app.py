@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, jsonify
 import logging
 import sys
 import os
+import threading
 from models.qa_system import ProteinQASystem
 from Bio.SeqUtils.ProtParam import ProteinAnalysis
 import numpy as np
@@ -21,17 +22,22 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Initialize Flask app with proper thread management
 app = Flask(__name__)
+app.config['PROPAGATE_EXCEPTIONS'] = True
 
-# Initialize the text-to-protein generator
-try:
-    text_to_protein = TextToProteinGenerator()
-    qa_system = ProteinQASystem()
-    logger.info("Systems initialized successfully")
-except Exception as e:
-    logger.error(f"Failed to initialize systems: {e}")
-    text_to_protein = None
-    qa_system = None
+# Use thread-local storage for API clients
+thread_local = threading.local()
+
+def get_text_to_protein():
+    if not hasattr(thread_local, 'text_to_protein'):
+        thread_local.text_to_protein = TextToProteinGenerator()
+    return thread_local.text_to_protein
+
+def get_qa_system():
+    if not hasattr(thread_local, 'qa_system'):
+        thread_local.qa_system = ProteinQASystem()
+    return thread_local.qa_system
 
 @app.route('/')
 def index():
@@ -97,6 +103,8 @@ def generate_protein():
         if not description or not isinstance(description, str):
             return jsonify({'error': 'Invalid description format'}), 400
 
+        # Get thread-local text-to-protein generator
+        text_to_protein = get_text_to_protein()
         if not text_to_protein:
             return jsonify({'error': 'Text-to-protein generator not available'}), 503
 
@@ -136,11 +144,13 @@ def ask_question():
         if not data or 'question' not in data or 'context' not in data:
             return jsonify({'error': 'Missing question or context'}), 400
 
-        if qa_system:
-            result = qa_system.answer_question(data['context'], data['question'])
-            return jsonify(result)
-        else:
+        # Get thread-local QA system
+        qa_system = get_qa_system()
+        if not qa_system:
             return jsonify({'error': 'QA system not available'}), 503
+
+        result = qa_system.answer_question(data['context'], data['question'])
+        return jsonify(result)
 
     except Exception as e:
         logger.error(f"Error in ask endpoint: {e}")
