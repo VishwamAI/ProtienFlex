@@ -154,7 +154,7 @@ Note: Copy each segment exactly as shown above. Do not modify any sequences."""
             url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent"
             headers = {
                 "Content-Type": "application/json",
-                "Authorization": f"Bearer {api_key}"
+                "x-goog-api-key": api_key  # Changed from Bearer to x-goog-api-key
             }
 
             # Prepare request data with safety settings and generation config
