@@ -14,21 +14,23 @@ class TestMolecularDynamics(unittest.TestCase):
         """Set up test fixtures"""
         cls.dynamics = MolecularDynamics()
 
-        # Create a simple test PDB file
-        cls.test_pdb = "test_protein.pdb"
+        # Set up paths
+        cls.test_dir = Path(__file__).parent
+        cls.test_pdb = cls.test_dir / "test_protein.pdb"
+        cls.alanine_pdb = cls.test_dir / "alanine-dipeptide.pdb"
         cls._create_test_pdb()
 
     @classmethod
     def tearDownClass(cls):
         """Clean up test fixtures"""
-        if Path(cls.test_pdb).exists():
-            Path(cls.test_pdb).unlink()
+        if cls.test_pdb.exists():
+            cls.test_pdb.unlink()
 
     @classmethod
     def _create_test_pdb(cls):
         """Create a simple test PDB file"""
         # Create a simple alanine dipeptide system
-        pdb = app.PDBFile('alanine-dipeptide.pdb')
+        pdb = app.PDBFile(str(cls.alanine_pdb))
         with open(cls.test_pdb, 'w') as f:
             app.PDBFile.writeFile(
                 pdb.topology,
@@ -50,7 +52,7 @@ class TestMolecularDynamics(unittest.TestCase):
 
     def test_simulation_setup(self):
         """Test simulation setup and system preparation"""
-        simulation, modeller = self.dynamics.setup_simulation(self.test_pdb)
+        simulation, modeller = self.dynamics.setup_simulation(str(self.test_pdb))
 
         # Verify simulation components
         self.assertIsInstance(simulation, app.Simulation)
@@ -63,7 +65,7 @@ class TestMolecularDynamics(unittest.TestCase):
 
     def test_minimize_and_equilibrate(self):
         """Test energy minimization and equilibration"""
-        simulation, _ = self.dynamics.setup_simulation(self.test_pdb)
+        simulation, _ = self.dynamics.setup_simulation(str(self.test_pdb))
         result = self.dynamics.minimize_and_equilibrate(simulation)
 
         # Check result structure
@@ -78,7 +80,7 @@ class TestMolecularDynamics(unittest.TestCase):
 
     def test_run_dynamics(self):
         """Test molecular dynamics simulation"""
-        simulation, _ = self.dynamics.setup_simulation(self.test_pdb)
+        simulation, _ = self.dynamics.setup_simulation(str(self.test_pdb))
         self.dynamics.minimize_and_equilibrate(simulation)
         result = self.dynamics.run_dynamics(simulation, steps=100)
 
@@ -135,7 +137,7 @@ class TestMolecularDynamics(unittest.TestCase):
         self.assertIn('structural_impact', mutation_result)
 
         # Setup and run dynamics
-        simulation, _ = self.dynamics.setup_simulation(self.test_pdb)
+        simulation, _ = self.dynamics.setup_simulation(str(self.test_pdb))
         dynamics_result = self.dynamics.minimize_and_equilibrate(simulation)
 
         # Verify combined results
