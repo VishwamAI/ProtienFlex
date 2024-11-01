@@ -3,6 +3,8 @@ import logging
 import sys
 import os
 import threading
+import requests
+import time
 from models.qa_system import ProteinQASystem
 from Bio.SeqUtils.ProtParam import ProteinAnalysis
 import numpy as np
@@ -22,22 +24,36 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Initialize Flask app with proper thread management
+# Initialize Flask app with proper configuration
 app = Flask(__name__)
-app.config['PROPAGATE_EXCEPTIONS'] = True
+app.config.update(
+    PROPAGATE_EXCEPTIONS=True,
+    MAX_CONTENT_LENGTH=16 * 1024 * 1024,  # 16MB max request size
+    REQUEST_TIMEOUT=300  # 5 minutes timeout
+)
 
-# Use thread-local storage for API clients
+# Use thread-local storage for API clients with proper error handling
 thread_local = threading.local()
 
 def get_text_to_protein():
-    if not hasattr(thread_local, 'text_to_protein'):
-        thread_local.text_to_protein = TextToProteinGenerator()
-    return thread_local.text_to_protein
+    try:
+        if not hasattr(thread_local, 'text_to_protein'):
+            logger.info("Initializing new TextToProteinGenerator instance")
+            thread_local.text_to_protein = TextToProteinGenerator()
+        return thread_local.text_to_protein
+    except Exception as e:
+        logger.error(f"Error initializing TextToProteinGenerator: {e}")
+        return None
 
 def get_qa_system():
-    if not hasattr(thread_local, 'qa_system'):
-        thread_local.qa_system = ProteinQASystem()
-    return thread_local.qa_system
+    try:
+        if not hasattr(thread_local, 'qa_system'):
+            logger.info("Initializing new ProteinQASystem instance")
+            thread_local.qa_system = ProteinQASystem()
+        return thread_local.qa_system
+    except Exception as e:
+        logger.error(f"Error initializing ProteinQASystem: {e}")
+        return None
 
 @app.route('/')
 def index():
@@ -94,48 +110,64 @@ Secondary Structure:
 
 @app.route('/generate', methods=['POST'])
 def generate_protein():
+    start_time = time.time()
+    logger.info("Received request to /generate endpoint")
+
     try:
         data = request.get_json()
         if not data or 'description' not in data:
+            logger.warning("No protein description provided in request")
             return jsonify({'error': 'No protein description provided'}), 400
 
         description = data['description']
         if not description or not isinstance(description, str):
+            logger.warning("Invalid description format in request")
             return jsonify({'error': 'Invalid description format'}), 400
 
-        # Get thread-local text-to-protein generator
+        # Get thread-local text-to-protein generator with timeout
         text_to_protein = get_text_to_protein()
         if not text_to_protein:
+            logger.error("Failed to initialize text-to-protein generator")
             return jsonify({'error': 'Text-to-protein generator not available'}), 503
 
         # Generate protein sequence using the correct method name
+        logger.info(f"Generating sequence for description: {description[:100]}...")
         sequence, explanation = text_to_protein.generate_sequence(description)
 
         if not sequence:
+            logger.warning(f"Failed to generate sequence. Explanation: {explanation}")
             return jsonify({'error': explanation or 'Failed to generate sequence'}), 500
 
         # Analyze the generated sequence
+        logger.info(f"Analyzing generated sequence of length {len(sequence)}")
         protein_analysis = ProteinAnalysis(sequence)
         molecular_weight = protein_analysis.molecular_weight()
         secondary_structure = protein_analysis.secondary_structure_fraction()
 
-        return jsonify({
+        response_data = {
             'sequence': sequence,
             'explanation': explanation,
             'analysis': {
                 'length': len(sequence),
                 'molecular_weight': molecular_weight,
                 'secondary_structure': {
-                    'alpha_helix': secondary_structure[0],
-                    'beta_sheet': secondary_structure[1],
-                    'random_coil': secondary_structure[2]
+                    'alpha_helix': float(secondary_structure[0]),
+                    'beta_sheet': float(secondary_structure[1]),
+                    'random_coil': float(secondary_structure[2])
                 }
-            }
-        })
+            },
+            'processing_time': f"{time.time() - start_time:.2f}s"
+        }
+
+        logger.info(f"Successfully generated and analyzed sequence in {time.time() - start_time:.2f}s")
+        return jsonify(response_data)
 
     except Exception as e:
-        logger.error(f"Error in generate endpoint: {e}")
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"Error in generate endpoint: {str(e)}", exc_info=True)
+        return jsonify({
+            'error': str(e),
+            'processing_time': f"{time.time() - start_time:.2f}s"
+        }), 500
 
 @app.route('/ask', methods=['POST'])
 def ask_question():

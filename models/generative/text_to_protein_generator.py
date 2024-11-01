@@ -1,8 +1,21 @@
 import os
-import re
-from typing import Dict, Any, Optional, Tuple
-import requests
 import json
+import re
+import logging
+import requests
+from typing import Dict, Any, Optional, Tuple, List
+from Bio.SeqUtils.ProtParam import ProteinAnalysis
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('protein_generator.log'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
 
 class TextToProteinGenerator:
     """Generate protein sequences using the Gemini API."""
@@ -128,20 +141,23 @@ SEGMENT_END
 Note: Copy each segment exactly as shown above. Do not modify any sequences."""
 
     def _call_gemini_api(self, prompt: str) -> Optional[Dict[str, Any]]:
-        """Make a request to the Gemini API."""
+        """Call the Gemini API with proper error handling and timeouts."""
         try:
-            # Print API key format for debugging (only first/last 4 chars)
-            key_preview = f"{self.api_key[:4]}...{self.api_key[-4:]}" if self.api_key else "None"
-            print(f"\nAPI Key format check: {key_preview}")
+            api_key = os.getenv('Gemini_api')
+            if not api_key:
+                logger.error("Gemini API key not found in environment variables")
+                return None
 
-            # Construct URL with API key
-            url = f"{self.api_url}?key={self.api_key}"
+            # Log API key format check (only first and last 4 chars)
+            logger.info(f"API Key format check: {api_key[:4]}...{api_key[-4:]}")
 
+            url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent"
             headers = {
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {api_key}"
             }
 
-            # Updated request format for Gemini API with additional safety settings
+            # Prepare request data with safety settings and generation config
             data = {
                 "contents": [{
                     "parts": [{
@@ -149,22 +165,10 @@ Note: Copy each segment exactly as shown above. Do not modify any sequences."""
                     }]
                 }],
                 "safetySettings": [
-                    {
-                        "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-                        "threshold": "BLOCK_NONE"
-                    },
-                    {
-                        "category": "HARM_CATEGORY_HATE_SPEECH",
-                        "threshold": "BLOCK_NONE"
-                    },
-                    {
-                        "category": "HARM_CATEGORY_HARASSMENT",
-                        "threshold": "BLOCK_NONE"
-                    },
-                    {
-                        "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
-                        "threshold": "BLOCK_NONE"
-                    }
+                    {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+                    {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+                    {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+                    {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}
                 ],
                 "generationConfig": {
                     "temperature": 0.7,
@@ -174,34 +178,38 @@ Note: Copy each segment exactly as shown above. Do not modify any sequences."""
                 }
             }
 
-            print(f"\nMaking API request to Gemini...")
-            print(f"URL: {self.api_url}")
-            print(f"Request data: {json.dumps(data, indent=2)}")
+            logger.info("\nMaking API request to Gemini...")
+            logger.info(f"URL: {url}")
+            logger.info(f"Request data: {json.dumps(data, indent=2)}")
 
+            # Make request with timeout
             response = requests.post(
                 url,
                 headers=headers,
-                json=data
+                json=data,
+                timeout=30  # 30 seconds timeout
             )
 
             if response.status_code != 200:
-                print(f"API Error - Status Code: {response.status_code}")
-                print(f"Response Headers: {response.headers}")
-                print(f"Response Content: {response.text}")
+                logger.error(f"API request failed with status code {response.status_code}")
+                logger.error(f"Response content: {response.text}")
                 return None
 
             response_data = response.json()
-            print(f"\nRaw API Response:\n{json.dumps(response_data, indent=2)}")
-
-            if 'candidates' not in response_data:
-                print("Error: No candidates in response")
-                return None
-
+            logger.info(f"API Response received: {json.dumps(response_data, indent=2)}")
             return response_data
+
+        except requests.exceptions.Timeout:
+            logger.error("API request timed out")
+            return None
+        except requests.exceptions.RequestException as e:
+            logger.error(f"API request failed: {str(e)}")
+            return None
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse API response: {str(e)}")
+            return None
         except Exception as e:
-            print(f"Error calling Gemini API: {e}")
-            if hasattr(e, 'response') and e.response is not None:
-                print(f"Response content: {e.response.text}")
+            logger.error(f"Unexpected error in API call: {str(e)}")
             return None
 
     def _parse_sequence_response(self, response: Dict[str, Any]) -> Tuple[Optional[str], Optional[str]]:
