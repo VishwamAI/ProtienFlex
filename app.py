@@ -1,12 +1,14 @@
 from flask import Flask, render_template, request, jsonify
 import logging
 import sys
+import os
 from models.qa_system import ProteinQASystem
 from Bio.SeqUtils.ProtParam import ProteinAnalysis
 import numpy as np
 import py3Dmol
 import biotite.structure as struc
 import biotite.structure.io as strucio
+from models.generative.text_to_protein_generator import TextToProteinGenerator
 
 # Configure logging
 logging.basicConfig(
@@ -21,11 +23,14 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
+# Initialize the text-to-protein generator
 try:
+    text_to_protein = TextToProteinGenerator()
     qa_system = ProteinQASystem()
-    logger.info("QA system initialized successfully")
+    logger.info("Systems initialized successfully")
 except Exception as e:
-    logger.error(f"Failed to initialize QA system: {e}")
+    logger.error(f"Failed to initialize systems: {e}")
+    text_to_protein = None
     qa_system = None
 
 @app.route('/')
@@ -79,6 +84,49 @@ Secondary Structure:
 
     except Exception as e:
         logger.error(f"Error in prediction endpoint: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/generate', methods=['POST'])
+def generate_protein():
+    try:
+        data = request.get_json()
+        if not data or 'description' not in data:
+            return jsonify({'error': 'No protein description provided'}), 400
+
+        description = data['description']
+        if not description or not isinstance(description, str):
+            return jsonify({'error': 'Invalid description format'}), 400
+
+        if not text_to_protein:
+            return jsonify({'error': 'Text-to-protein generator not available'}), 503
+
+        # Generate protein sequence using the correct method name
+        sequence, explanation = text_to_protein.generate_sequence(description)
+
+        if not sequence:
+            return jsonify({'error': explanation or 'Failed to generate sequence'}), 500
+
+        # Analyze the generated sequence
+        protein_analysis = ProteinAnalysis(sequence)
+        molecular_weight = protein_analysis.molecular_weight()
+        secondary_structure = protein_analysis.secondary_structure_fraction()
+
+        return jsonify({
+            'sequence': sequence,
+            'explanation': explanation,
+            'analysis': {
+                'length': len(sequence),
+                'molecular_weight': molecular_weight,
+                'secondary_structure': {
+                    'alpha_helix': secondary_structure[0],
+                    'beta_sheet': secondary_structure[1],
+                    'random_coil': secondary_structure[2]
+                }
+            }
+        })
+
+    except Exception as e:
+        logger.error(f"Error in generate endpoint: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/ask', methods=['POST'])
