@@ -44,7 +44,9 @@ jobs:
           # Install build dependencies first
           pip install setuptools wheel Cython==0.29.36
           # Install mdtraj dependencies
-          pip install numpy==1.23.5 scipy==1.10.1
+          pip install numpy==1.21.6 scipy==1.7.3
+          # Install mdtraj from binary
+          pip install --only-binary :all: mdtraj==1.9.3
           # Install remaining requirements
           pip install -r requirements.txt
 
