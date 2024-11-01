@@ -46,7 +46,7 @@ jobs:
           # Install mdtraj dependencies
           pip install numpy==1.21.6 scipy==1.7.3
           # Install mdtraj from binary
-          pip install --only-binary :all: mdtraj==1.9.3
+          pip install --only-binary :all: mdtraj==1.10.0
           # Install remaining requirements
           pip install -r requirements.txt
 
