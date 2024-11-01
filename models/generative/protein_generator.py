@@ -6,8 +6,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from transformers import PreTrainedModel, PretrainedConfig
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union, Any
 import numpy as np
+import os
+import google.generativeai as genai
+import asyncio
 
 class ProteinGenerativeConfig(PretrainedConfig):
     """Configuration class for protein generation model"""
@@ -150,6 +153,7 @@ class ProteinGenerativeModel(PreTrainedModel):
     def __init__(self, config: ProteinGenerativeConfig):
         super().__init__(config)
         self.config = config
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
         # Initialize embeddings with proper padding
         self.embeddings = nn.Embedding(
@@ -170,6 +174,15 @@ class ProteinGenerativeModel(PreTrainedModel):
 
         # Initialize output projection for token prediction
         self.output_projection = nn.Linear(config.hidden_size, config.vocab_size)
+
+        # Add amino acid mappings
+        self.aa_to_idx = {
+            'A': 0, 'C': 1, 'D': 2, 'E': 3, 'F': 4,
+            'G': 5, 'H': 6, 'I': 7, 'K': 8, 'L': 9,
+            'M': 10, 'N': 11, 'P': 12, 'Q': 13, 'R': 14,
+            'S': 15, 'T': 16, 'V': 17, 'W': 18, 'Y': 19,
+        }
+        self.idx_to_aa = {v: k for k, v in self.aa_to_idx.items()}
 
         # Initialize weights
         self.init_weights()
@@ -258,7 +271,7 @@ class ProteinGenerativeModel(PreTrainedModel):
 
     def generate(
         self,
-        input_ids: torch.Tensor,
+        input_ids: Union[str, torch.Tensor],
         max_length: int = 512,
         temperature: float = 1.0,
         do_sample: bool = True,
@@ -266,8 +279,14 @@ class ProteinGenerativeModel(PreTrainedModel):
         top_p: float = 0.95,
         attention_mask: Optional[torch.Tensor] = None,
         **kwargs,
-    ) -> torch.Tensor:
-        """Generate protein sequences"""
+    ) -> Union[str, torch.Tensor]:
+        """Generate protein sequences from text or tensor input"""
+        # Handle string input
+        return_text = isinstance(input_ids, str)
+        if return_text:
+            tokens = [self.aa_to_idx.get(aa.upper(), 0) for aa in input_ids if aa.isalpha()]
+            input_ids = torch.tensor([tokens], dtype=torch.long, device=self.device)
+
         batch_size = input_ids.size(0)
         current_length = input_ids.size(1)
         device = input_ids.device
@@ -333,5 +352,13 @@ class ProteinGenerativeModel(PreTrainedModel):
                 attention_mask,
                 torch.ones((batch_size, 1), device=device)
             ], dim=1)
+
+        # Convert output to text if input was string
+        if return_text:
+            sequences = []
+            for seq in generated.cpu().numpy():
+                sequence = ''.join(self.idx_to_aa.get(token, 'X') for token in seq)
+                sequences.append(sequence)
+            return sequences[0] if len(sequences) == 1 else sequences
 
         return generated
