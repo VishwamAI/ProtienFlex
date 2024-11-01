@@ -28,7 +28,14 @@ jobs:
             dssp \
             build-essential \
             curl \
-            git
+            git \
+            python3-dev \
+            gcc \
+            gfortran \
+            libblas-dev \
+            liblapack-dev \
+            libhdf5-dev \
+            libnetcdf-dev
 
       - name: Install Python dependencies
         run: |
