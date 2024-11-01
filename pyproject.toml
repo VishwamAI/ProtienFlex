@@ -1,0 +1,77 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "proteinflex"
+version = "1.0.0"
+description = "AI-driven protein development and analysis toolkit"
+authors = [
+    {name = "VishwamAI", email = "contact@vishwamai.com"}
+]
+readme = "README.md"
+requires-python = ">=3.10,<3.11"
+license = {text = "MIT"}
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "torch>=2.0.0",
+    "numpy>=1.21.0",
+    "scipy>=1.10.0",
+    "pandas>=2.0.0",
+    "scikit-learn>=1.2.0",
+    "biopython>=1.79",
+    "mdtraj>=1.9.7",
+    "prody>=2.4.0",
+    "requests>=2.31.0",
+    "tqdm>=4.66.0",
+    "matplotlib>=3.8.0",
+    "seaborn>=0.13.0",
+    "pytest>=8.0.0",
+    "pytest-cov>=4.1.0",
+    "jax>=0.4.20",
+    "jaxlib>=0.4.20",
+    "dm-haiku>=0.0.10",
+    "tensorflow>=2.15.0",
+    "openmm>=8.1.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black",
+    "flake8",
+    "isort",
+    "mypy",
+    "pytest",
+    "pytest-cov",
+]
+docs = [
+    "sphinx",
+    "sphinx-rtd-theme",
+    "myst-parser",
+]
+
+[project.urls]
+Homepage = "https://github.com/VishwamAI/ProtienFlex"
+Repository = "https://github.com/VishwamAI/ProtienFlex.git"
+Documentation = "https://proteinflex.readthedocs.io"
+
+[tool.black]
+line-length = 88
+target-version = ["py310"]
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q --cov=proteinflex"
+testpaths = ["tests"]
