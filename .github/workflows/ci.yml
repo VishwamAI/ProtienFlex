@@ -51,11 +51,16 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run tests
+        env:
+          OPENAI_APIKEY: ${{ secrets.OPENAI_APIKEY }}
+          CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+          GEMINI_API: ${{ secrets.GEMINI_API }}
         run: |
           cd tests
           python -m pytest \
             test_dynamics.py \
             test_mutation_analysis.py \
+            test_api_integration.py \
             -v --cov=../models
 
       - name: Check code style

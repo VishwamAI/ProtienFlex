@@ -37,3 +37,9 @@ openmm==8.1.1  # Use a stable version for compatibility
 
 # ESM for protein language modeling
 fair-esm==2.0.0
+
+# API Integration
+openai>=1.0.0  # OpenAI API client
+anthropic>=0.3.0  # Claude API client
+google-generativeai>=0.1.0  # Gemini API client
+python-dotenv>=1.0.0  # For environment variable management
