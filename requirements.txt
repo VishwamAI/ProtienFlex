@@ -5,8 +5,8 @@ Cython==0.29.36  # Pin to specific version for mdtraj compatibility
 
 # Core ML and scientific computing
 torch==2.0.1
-numpy==1.21.6  # Pin to version compatible with mdtraj
-scipy==1.7.3  # Pin to version compatible with mdtraj
+numpy==1.23.5  # Version compatible with mdtraj 1.10.0
+scipy==1.9.3  # Updated version compatible with numpy 1.23.5
 pandas==2.0.3
 scikit-learn==1.2.2
 
