@@ -41,6 +41,11 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install pytest pytest-cov
+          # Install build dependencies first
+          pip install setuptools wheel Cython==0.29.36
+          # Install mdtraj dependencies
+          pip install numpy==1.23.5 scipy==1.10.1
+          # Install remaining requirements
           pip install -r requirements.txt
 
       - name: Run tests
