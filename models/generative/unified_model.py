@@ -8,7 +8,7 @@ import torch
 import numpy as np
 
 from .api_integration import APIManager
-from .protein_generator import ProteinGenerativeModel
+from .protein_generator import ProteinGenerativeModel, ProteinGenerativeConfig
 from .structure_predictor import StructurePredictor
 from .virtual_screening import VirtualScreeningModel
 
@@ -27,8 +27,20 @@ class UnifiedProteinModel:
         """
         self.device = torch.device('cuda' if use_gpu and torch.cuda.is_available() else 'cpu')
 
+        # Initialize configurations and local models
+        protein_config = ProteinGenerativeConfig(
+            vocab_size=30,
+            hidden_size=256,
+            num_hidden_layers=6,
+            num_attention_heads=8,
+            intermediate_size=1024,
+            hidden_dropout_prob=0.1,
+            attention_probs_dropout_prob=0.1,
+            max_position_embeddings=512,
+        )
+
         # Initialize local models
-        self.local_generator = ProteinGenerativeModel().to(self.device)
+        self.local_generator = ProteinGenerativeModel(protein_config).to(self.device)
         self.structure_predictor = StructurePredictor().to(self.device)
         self.screening_model = VirtualScreeningModel().to(self.device)
 
