@@ -170,7 +170,7 @@ class InteractionPredictor(nn.Module):
             'interaction_sites': interaction_sites,
         }
 
-class VirtualScreening:
+class VirtualScreeningModel:
     """Main class for virtual screening pipeline"""
     def __init__(
         self,
