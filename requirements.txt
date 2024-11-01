@@ -11,7 +11,7 @@ pandas==2.0.3
 scikit-learn==1.2.2
 
 # Protein structure analysis
-biopython==1.81
+biopython==1.79  # Pin to version compatible with prody
 mdtraj==1.10.0  # Use latest version with pre-built binary support
 prody==2.4.1  # Pin to a specific version for compatibility
 biotite==0.35.0
