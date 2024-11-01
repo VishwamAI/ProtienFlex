@@ -170,15 +170,18 @@ class InteractionPredictor(nn.Module):
             'interaction_sites': interaction_sites,
         }
 
-class VirtualScreeningModel:
+class VirtualScreeningModel(nn.Module):
     """Main class for virtual screening pipeline"""
     def __init__(
         self,
-        device: str = 'cuda' if torch.cuda.is_available() else 'cpu',
+        device: Optional[str] = None,
     ):
-        self.device = device
-        self.molecule_encoder = MoleculeEncoder().to(device)
-        self.interaction_predictor = InteractionPredictor().to(device)
+        super().__init__()
+        self.device = device or ('cuda' if torch.cuda.is_available() else 'cpu')
+
+        # Initialize submodules
+        self.molecule_encoder = MoleculeEncoder()
+        self.interaction_predictor = InteractionPredictor()
 
     def prepare_molecule(self, smiles: str) -> Dict[str, torch.Tensor]:
         """Convert SMILES to molecule features with correct dimensions"""
