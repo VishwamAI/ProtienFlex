@@ -1,6 +1,7 @@
 # Build dependencies
 setuptools>=65.5.1
 wheel>=0.38.4
+Cython>=0.29.24
 
 # Core ML and scientific computing
 torch==2.0.1
