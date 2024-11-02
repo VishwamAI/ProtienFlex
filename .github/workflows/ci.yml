@@ -45,25 +45,27 @@ jobs:
         uses: conda-incubator/setup-miniconda@v3
         with:
           python-version: "3.10"
-          channels: conda-forge,defaults
+          channels: conda-forge,defaults,pytorch
           channel-priority: strict
           activate-environment: proteinflex-env
-          environment-file: environment-core.yml
+          environment-file: environment.yml
           auto-activate-base: false
           auto-update-conda: true
+          use-mamba: true
+
+      - name: Verify conda environment
+        shell: bash -el {0}
+        run: |
+          conda info
+          conda list
+          python -c "import sys; print('Python version:', sys.version)"
 
       - name: Install package
         shell: bash -el {0}
         run: |
-          # Verify conda environment
-          conda info
-          conda list
-          # Install dependencies first
-          python -m pip install --upgrade pip
-          # Install package without dependencies to avoid rebuilding
-          pip install --no-deps -e .
-          # Verify installations
-          python -c "import sys; print('Python path:'); [print(p) for p in sys.path]; import mdtraj; import prody; import openmm; print('Dependencies verified')"
+          # Verify key dependencies are installed
+          python -c "import numpy; import mdtraj; import prody; import openmm; print('Core dependencies verified')"
+          python -c "import torch; import transformers; print('ML dependencies verified')"
 
       - name: Run tests
         shell: bash -el {0}
@@ -74,7 +76,10 @@ jobs:
           PYTHONWARNINGS: ignore::DeprecationWarning
           TRANSFORMERS_OFFLINE: 1
           CUDA_VISIBLE_DEVICES: ""
+          OMP_NUM_THREADS: 1
+          MKL_NUM_THREADS: 1
         run: |
+          # Run tests with coverage
           pytest tests/ -v --cov=proteinflex --cov-report=xml --import-mode=importlib
 
       - name: Upload coverage to Codecov
@@ -102,17 +107,19 @@ jobs:
         uses: conda-incubator/setup-miniconda@v3
         with:
           python-version: "3.10"
-          channels: conda-forge,defaults
+          channels: conda-forge,defaults,pytorch
           channel-priority: strict
           activate-environment: proteinflex-env
-          environment-file: environment-core.yml
+          environment-file: environment.yml
           auto-activate-base: false
           auto-update-conda: true
+          use-mamba: true
 
       - name: Build package
         shell: bash -el {0}
         run: |
-          pip install build wheel
+          # Build package
+          python -m pip install --upgrade pip build wheel
           python -m build
           python setup.py bdist_wheel
 
