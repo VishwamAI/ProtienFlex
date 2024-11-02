@@ -54,11 +54,13 @@ jobs:
             cython=3.0.11
 
       - name: Install package
-        shell: micromamba-shell {0}
+        shell: bash -l {0}
         run: |
           # Verify conda environment
           micromamba info
           micromamba list
+          # Ensure environment is activated
+          micromamba activate proteinflex-env
           # Install dependencies first
           python -m pip install --upgrade pip
           # Install package without dependencies to avoid rebuilding
@@ -67,7 +69,7 @@ jobs:
           python -c "import sys; print('Python path:'); [print(p) for p in sys.path]; import mdtraj; import prody; import openmm; print('Dependencies verified')"
 
       - name: Run tests
-        shell: micromamba-shell {0}
+        shell: bash -l {0}
         env:
           PYTHONPATH: ${{ github.workspace }}
           OPENMM_CPU_THREADS: 1
