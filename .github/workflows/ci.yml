@@ -55,8 +55,14 @@ jobs:
       - name: Install package
         shell: bash -l {0}
         run: |
+          # Verify conda environment
+          conda list
+          # Install dependencies first
           python -m pip install --upgrade pip
+          # Install package without dependencies to avoid rebuilding
           pip install --no-deps -e .
+          # Verify installations
+          python -c "import mdtraj; import prody; import openmm; print('Dependencies verified')"
 
       - name: Run tests
         shell: bash -l {0}
