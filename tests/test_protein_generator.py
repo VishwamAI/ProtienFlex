@@ -1,7 +1,10 @@
 import pytest
 import torch
 from unittest.mock import Mock, patch
-from proteinflex.models.generative.protein_generator import ProteinGenerator, ProteinGenerativeConfig
+from proteinflex.models.generative.protein_generator import ProteinGenerator, ProteinGenerativeConfig, HAS_GOOGLE_API
+
+# Define markers for API-dependent tests
+pytestmark = pytest.mark.skipif(not HAS_GOOGLE_API, reason="Google API not available")
 
 @pytest.fixture
 def mock_transformer():

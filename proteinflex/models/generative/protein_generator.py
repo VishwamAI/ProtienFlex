@@ -33,8 +33,14 @@ Protein Generator Module - Implements generative AI for protein sequence and str
 import math
 from typing import Dict, List, Optional, Tuple, Union, Any
 import os
-import google.generativeai as genai
 import asyncio
+
+# Try to import google.generativeai, but make it optional
+try:
+    import google.generativeai as genai
+    HAS_GOOGLE_API = True
+except ImportError:
+    HAS_GOOGLE_API = False
 
 PreTrainedModel = transformers.PreTrainedModel
 PretrainedConfig = transformers.PretrainedConfig
