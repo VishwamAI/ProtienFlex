@@ -51,8 +51,8 @@ jobs:
           auto-activate-base: false
           auto-update-conda: true
           use-mamba: true
-          create-env-file: environment-base.yml
-          environment-file: false
+          conda-build-version: "*"
+          miniforge-variant: Mambaforge
 
       - name: Verify conda environment
         shell: bash -el {0}
@@ -124,8 +124,8 @@ jobs:
           auto-activate-base: false
           auto-update-conda: true
           use-mamba: true
-          create-env-file: environment-base.yml
-          environment-file: false
+          conda-build-version: "*"
+          miniforge-variant: Mambaforge
 
       - name: Install dependencies
         shell: bash -el {0}
