@@ -619,6 +619,11 @@ def create_mock_esm_model():
 
     model = Mock()
     model.forward = mock_forward
+    model.eval = Mock(return_value=model)
+    model.to = Mock(return_value=model)
+    model.train = Mock(return_value=model)
+    model.predict_contacts = Mock(return_value=MockTensor(np.random.rand(1, 100, 100)))
+    model.predict_secondary_structure = Mock(return_value=MockTensor(np.random.rand(1, 100, 3)))
     return model
 
 def create_mock_batch_converter():
@@ -677,14 +682,30 @@ def create_mock_rdkit():
 
     # Configure Chem.MolFromSmiles
     mock_rdkit.Chem.MolFromSmiles.return_value = mock_mol
+    mock_rdkit.Chem.MolFromPDBFile.return_value = mock_mol
+    mock_rdkit.Chem.MolFromPDBBlock.return_value = mock_mol
+    mock_rdkit.Chem.AddHs.return_value = mock_mol
 
     # Configure AllChem
     mock_rdkit.Chem.AllChem.ComputeMolVolume.return_value = 150.0
     mock_rdkit.Chem.AllChem.EmbedMolecule.return_value = 0
+    mock_rdkit.Chem.AllChem.MMFFOptimizeMolecule.return_value = 0
+    mock_rdkit.Chem.AllChem.GetBestRMS.return_value = 1.5
+    mock_rdkit.Chem.AllChem.Compute2DCoords.return_value = 0
 
     # Configure descriptors
     mock_rdkit.Chem.Descriptors.ExactMolWt.return_value = 250.0
     mock_rdkit.Chem.Descriptors.MolLogP.return_value = 2.5
+    mock_rdkit.Chem.Descriptors.TPSA.return_value = 75.0
+    mock_rdkit.Chem.Descriptors.NumRotatableBonds.return_value = 5
+    mock_rdkit.Chem.Descriptors.NumHAcceptors.return_value = 3
+    mock_rdkit.Chem.Descriptors.NumHDonors.return_value = 2
+
+    # Configure molecule methods
+    mock_mol.GetNumAtoms.return_value = 20
+    mock_mol.GetPositions.return_value = np.random.rand(20, 3)
+    mock_mol.GetConformers.return_value = [MagicMock()]
+    mock_mol.GetBonds.return_value = [MagicMock()]
 
     return mock_rdkit
 
