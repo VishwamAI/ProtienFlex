@@ -9,6 +9,10 @@ dependencies:
   - gcc
   - gxx
   - pkg-config
+  - swig
+  - fftw
+  - hdf5
+  - netcdf4
 
   # Core dependencies
   - python=3.10
@@ -40,10 +44,10 @@ dependencies:
   - pytest-env
   - pytest-randomly
 
+  # Deep learning dependencies (CPU only)
+  - pytorch::pytorch=2.0.1=cpu
+  - transformers=4.32.0
   - pip:
-    # Deep learning dependencies (CPU only)
-    - torch==2.0.1 --extra-index-url https://download.pytorch.org/whl/cpu
-    - transformers==4.32.0
     - google-cloud-aiplatform==1.35.0
     - coverage-badge==1.1.0
 
