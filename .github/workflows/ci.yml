@@ -28,7 +28,18 @@ jobs:
             libblas-dev \
             liblapack-dev \
             libhdf5-dev \
-            libnetcdf-dev
+            libnetcdf-dev \
+            libfftw3-dev \
+            libopenmm-dev \
+            libboost-all-dev \
+            libxml2-dev \
+            libxslt1-dev \
+            zlib1g-dev \
+            libjpeg-dev \
+            libpng-dev \
+            libfreetype6-dev \
+            libatlas-base-dev \
+            pkg-config
 
       - name: Set up micromamba
         uses: mamba-org/setup-micromamba@v1
