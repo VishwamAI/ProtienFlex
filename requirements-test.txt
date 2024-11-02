@@ -17,10 +17,6 @@ transformers==4.32.0
 biopython==1.79
 scipy==1.9.3
 pandas==2.0.3
-mdtraj==1.9.7
-prody==2.4.1
-openmm==8.0.0
-parmed==3.4.3
 
 # Use pre-built wheels for problematic packages
---only-binary :all: mdtraj prody
+--only-binary :all:

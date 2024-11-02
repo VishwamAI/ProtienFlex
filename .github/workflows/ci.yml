@@ -51,11 +51,16 @@ jobs:
           pip install Cython wheel setuptools
 
           # Install specialized packages via conda first
-          conda install -y -c conda-forge numpy=1.24.4 prody=2.4.1
-          conda install -y -c conda-forge mdtraj=1.9.7 openmm=8.0.0 parmed=3.4.3
+          conda install -y -c conda-forge \
+            python=3.10 \
+            numpy=1.24.4 \
+            scipy=1.9.3 \
+            mdtraj=1.9.7 \
+            openmm=8.0.0 \
+            prody=2.4.1 \
+            parmed=3.4.3
 
           # Install remaining Python packages via pip
-          pip install scipy==1.9.3
           pip install torch==2.0.1 --index-url https://download.pytorch.org/whl/cpu
           pip install transformers==4.32.0
 
