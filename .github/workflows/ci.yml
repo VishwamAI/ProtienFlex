@@ -48,27 +48,26 @@ jobs:
           init-shell: bash
           cache-environment: true
           post-cleanup: all
+          environment-name: proteinflex-env
           create-args: >-
             python=3.10
             cython=3.0.11
 
       - name: Install package
-        shell: bash -l {0}
+        shell: micromamba-shell {0}
         run: |
           # Verify conda environment
+          micromamba info
           micromamba list
-          # Ensure environment is activated
-          eval "$(micromamba shell hook --shell=bash)"
-          micromamba activate proteinflex-test-core
           # Install dependencies first
           python -m pip install --upgrade pip
           # Install package without dependencies to avoid rebuilding
           pip install --no-deps -e .
           # Verify installations
-          python -c "import sys; print(sys.path); import mdtraj; import prody; import openmm; print('Dependencies verified')"
+          python -c "import sys; print('Python path:'); [print(p) for p in sys.path]; import mdtraj; import prody; import openmm; print('Dependencies verified')"
 
       - name: Run tests
-        shell: bash -l {0}
+        shell: micromamba-shell {0}
         env:
           PYTHONPATH: ${{ github.workspace }}
           OPENMM_CPU_THREADS: 1
