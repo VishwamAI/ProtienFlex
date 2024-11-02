@@ -41,26 +41,23 @@ jobs:
             libatlas-base-dev \
             pkg-config
 
-      - name: Set up micromamba
-        uses: mamba-org/setup-micromamba@v1
+      - name: Set up conda
+        uses: conda-incubator/setup-miniconda@v3
         with:
+          python-version: "3.10"
+          channels: conda-forge,defaults
+          channel-priority: strict
+          activate-environment: proteinflex-env
           environment-file: environment-core.yml
-          init-shell: bash
-          cache-environment: true
-          post-cleanup: all
-          environment-name: proteinflex-env
-          create-args: >-
-            python=3.10
-            cython=3.0.11
+          auto-activate-base: false
+          auto-update-conda: true
 
       - name: Install package
-        shell: bash -l {0}
+        shell: bash -el {0}
         run: |
           # Verify conda environment
-          micromamba info
-          micromamba list
-          # Ensure environment is activated
-          micromamba activate proteinflex-env
+          conda info
+          conda list
           # Install dependencies first
           python -m pip install --upgrade pip
           # Install package without dependencies to avoid rebuilding
@@ -69,7 +66,7 @@ jobs:
           python -c "import sys; print('Python path:'); [print(p) for p in sys.path]; import mdtraj; import prody; import openmm; print('Dependencies verified')"
 
       - name: Run tests
-        shell: bash -l {0}
+        shell: bash -el {0}
         env:
           PYTHONPATH: ${{ github.workspace }}
           OPENMM_CPU_THREADS: 1
@@ -89,7 +86,7 @@ jobs:
           fail_ci_if_error: true
 
       - name: Check code style
-        shell: bash -l {0}
+        shell: bash -el {0}
         run: |
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
           flake8 . --count --exit-zero --max-complexity=10 --max-line-length=80 --statistics
@@ -101,16 +98,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up micromamba
-        uses: mamba-org/setup-micromamba@v1
+      - name: Set up conda
+        uses: conda-incubator/setup-miniconda@v3
         with:
+          python-version: "3.10"
+          channels: conda-forge,defaults
+          channel-priority: strict
+          activate-environment: proteinflex-env
           environment-file: environment-core.yml
-          init-shell: bash
-          cache-environment: true
-          post-cleanup: all
+          auto-activate-base: false
+          auto-update-conda: true
 
       - name: Build package
-        shell: bash -l {0}
+        shell: bash -el {0}
         run: |
           pip install build wheel
           python -m build
