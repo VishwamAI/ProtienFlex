@@ -908,13 +908,22 @@ def setup_mock_environment():
     mock_openmm = create_mock_openmm()
 
     # Combine all mocks into environment
-    return {
+    mock_env = {
         'esm': mock_esm,
         'rdkit': mock_rdkit,
         'transformers': mock_transformers,
-        'openmm': {
-            'mm': mock_openmm['mm'],
-            'app': mock_openmm['app'],
-            'unit': mock_openmm['unit']
-        }
+        'openmm': mock_openmm['openmm'],
+        'mm': mock_openmm['mm'],
+        'app': mock_openmm['app'],
+        'unit': mock_openmm['unit']
     }
+
+    # Set up module-level mocks for imports
+    sys.modules['esm'] = mock_esm
+    sys.modules['rdkit'] = mock_rdkit
+    sys.modules['transformers'] = mock_transformers
+    sys.modules['openmm'] = mock_openmm['openmm']
+    sys.modules['openmm.app'] = mock_openmm['app']
+    sys.modules['openmm.unit'] = mock_openmm['unit']
+
+    return mock_env
