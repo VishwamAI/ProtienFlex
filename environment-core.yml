@@ -28,7 +28,6 @@ dependencies:
   - biopython=1.84
   - biotite=0.38.0
   - openmm=8.0.0
-  - mdtraj=1.9.7
   - prody=2.4.1
 
   # Testing dependencies
@@ -48,6 +47,11 @@ dependencies:
   - pytorch::pytorch=2.0.1=cpu
   - transformers=4.32.0
   - pip:
+    # Scientific packages that need specific versions
+    - mdtraj==1.9.7
+    - numpy==1.24.4
+
+    # Other pip packages
     - google-cloud-aiplatform==1.35.0
     - coverage-badge==1.1.0
 
