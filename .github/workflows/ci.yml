@@ -23,7 +23,6 @@ jobs:
           sudo apt-get install -y \
             swig \
             cmake \
-            libopenmm-dev \
             dssp \
             build-essential \
             curl \
@@ -36,33 +35,55 @@ jobs:
             libhdf5-dev \
             libnetcdf-dev
 
-      - name: Install Python dependencies
+      - name: Set up Conda for specialized packages
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          python-version: '3.10'
+          channels: conda-forge
+          activate-environment: proteinflex-env
+          auto-activate-base: false
+
+      - name: Install dependencies
+        shell: bash -l {0}
         run: |
+          # Install core Python packages via pip
           python -m pip install --upgrade pip
-          pip install pytest pytest-cov
-          # Install build dependencies first
-          pip install setuptools wheel Cython==0.29.36
-          # Install mdtraj dependencies
-          pip install numpy==1.23.5 scipy==1.9.3
-          # Install mdtraj from binary
-          pip install --only-binary :all: mdtraj==1.10.0
-          # Install remaining requirements
-          pip install -r requirements.txt
+          pip install numpy==1.24.4 scipy==1.9.3
+          pip install torch==2.0.1 --index-url https://download.pytorch.org/whl/cpu
+          pip install transformers==4.32.0
+
+          # Install specialized packages via conda
+          conda install -y -c conda-forge mdtraj=1.9.7 openmm=8.0.0 prody=2.4.1
+
+          # Install test dependencies and package
+          pip install pytest pytest-cov coverage
+          pip install -r requirements-test.txt
+          pip install -e .
 
       - name: Run tests
+        shell: bash -l {0}
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+          OPENMM_CPU_THREADS: 1
+          PROTEINFLEX_TEST_MODE: 1
+          PYTHONWARNINGS: ignore::DeprecationWarning
+          TRANSFORMERS_OFFLINE: 1
         run: |
-          cd tests
-          python -m pytest \
-            test_dynamics.py \
-            test_mutation_analysis.py \
-            -v --cov=../models
+          pytest tests/ -v --cov=proteinflex --cov-report=xml --import-mode=importlib
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: true
 
       - name: Check code style
         run: |
           pip install flake8
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-          flake8 . --count --exit-zero --max-complexity=10 \
-            --max-line-length=80 --statistics
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=80 --statistics
 
   build:
     runs-on: ubuntu-latest

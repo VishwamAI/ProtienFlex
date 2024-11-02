@@ -1,0 +1,26 @@
+# Test dependencies
+pytest==8.0.0
+pytest-cov==4.1.0
+pytest-mock==3.12.0
+pytest-asyncio==0.23.5
+pytest-timeout==2.2.0
+pytest-xdist==3.5.0
+coverage-badge==1.1.0
+mock==5.1.0
+pytest-env==1.1.3
+pytest-randomly==3.15.0
+
+# Core dependencies with specific versions
+numpy==1.24.4
+torch==2.0.1
+transformers==4.32.0
+biopython==1.79
+scipy==1.9.3
+pandas==2.0.3
+mdtraj==1.10.0
+prody==2.4.1
+openmm==8.0.0
+parmed==4.1.0
+
+# Use pre-built wheels for problematic packages
+--only-binary :all: mdtraj prody
