@@ -66,13 +66,13 @@ jobs:
           # Install ML dependencies
           pip install torch==1.13.1+cpu --extra-index-url https://download.pytorch.org/whl/cpu
           pip install transformers==4.25.1 tokenizers==0.13.2
-          pip install google-generativeai==0.2.0
+          # Skip API dependencies for Python 3.8
           # Install testing dependencies
           pip install pytest==7.1.2 pytest-cov==3.0.0 coverage==6.5.0 flake8==5.0.4
           pip install pytest-mock==3.10.0 pytest-asyncio==0.20.3 pytest-timeout==2.1.0
           pip install pytest-xdist==3.1.0 mock==5.0.1 pytest-env==0.8.1 pytest-randomly==3.12.0
           # Install package in editable mode
-          pip install -e .
+          pip install -e .[test]
 
       - name: Run tests
         shell: bash -el {0}
