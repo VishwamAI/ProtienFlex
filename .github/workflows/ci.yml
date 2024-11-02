@@ -48,7 +48,8 @@ jobs:
         run: |
           # Install core Python packages via pip
           python -m pip install --upgrade pip
-          pip install numpy==1.24.4 scipy==1.9.3
+          pip install numpy==1.23.5
+          pip install scipy==1.9.3
           pip install torch==2.0.1 --index-url https://download.pytorch.org/whl/cpu
           pip install transformers==4.32.0
 
