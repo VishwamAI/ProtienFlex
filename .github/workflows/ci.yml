@@ -48,6 +48,7 @@ jobs:
         run: |
           # Install core Python packages via pip
           python -m pip install --upgrade pip
+          pip install Cython wheel setuptools
           pip install numpy==1.23.5
           pip install scipy==1.9.3
           pip install torch==2.0.1 --index-url https://download.pytorch.org/whl/cpu
@@ -58,7 +59,7 @@ jobs:
 
           # Install test dependencies and package
           pip install pytest pytest-cov coverage
-          pip install -r requirements-test.txt
+          pip install --prefer-binary -r requirements-test.txt
           pip install -e .
 
       - name: Run tests
