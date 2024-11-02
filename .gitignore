@@ -8,6 +8,9 @@ venv/
 ENV/
 .env
 .python-version
+*.egg-info/
+.coverage
+coverage.xml
 
 # IDE
 .idea/
@@ -26,6 +29,12 @@ log/
 .env.development.local
 .env.test.local
 .env.production.local
+*.pdb
+*_test_env/
+*.sh
+temp_*.py
+test_*.py
+!tests/test_*.py
 
 # Dependencies
 node_modules/

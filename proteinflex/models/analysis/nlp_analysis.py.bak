@@ -127,10 +127,13 @@ class ProteinNLPAnalyzer:
             analysis = ProteinAnalysis(sequence)
             instability_index = analysis.instability_index()
             flexibility = analysis.flexibility()
+            # Convert flexibility list to tensor and calculate mean properly
+            if isinstance(flexibility, (list, np.ndarray)):
+                flexibility = torch.tensor(flexibility, dtype=torch.float32)
             stability = {
                 'index': instability_index,
                 'is_stable': instability_index < 40,
-                'flexibility': np.mean(flexibility)
+                'flexibility': torch.mean(flexibility).item() if isinstance(flexibility, torch.Tensor) else np.mean(flexibility)
             }
             return stability
         except Exception as e:

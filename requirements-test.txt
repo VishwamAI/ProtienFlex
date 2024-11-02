@@ -20,7 +20,7 @@ pandas==2.0.3
 mdtraj==1.10.0
 prody==2.4.1
 openmm==8.0.0
-parmed==4.1.0
+parmed==3.4.3
 
 # Use pre-built wheels for problematic packages
 --only-binary :all: mdtraj prody

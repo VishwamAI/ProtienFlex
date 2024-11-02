@@ -1,3 +1,4 @@
+from proteinflex.models.utils.lazy_imports import numpy, torch, openmm
 # MIT License
 # 
 # Copyright (c) 2024 VishwamAI
@@ -20,11 +21,9 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-import torch
 from transformers import AutoTokenizer, AutoModel, pipeline, AutoModelForSequenceClassification
 from Bio import SeqIO
 from Bio.PDB import *
-import numpy as np
 from Bio.SeqUtils.ProtParam import ProteinAnalysis
 
 class ProteinLanguageModel:
@@ -113,6 +112,28 @@ class ProteinLanguageModel:
             })
 
         return results
+
+    def get_interaction_sites(self, sequence_features):
+        """Identify potential interaction sites from sequence features."""
+        embeddings = torch.tensor(sequence_features['embeddings'])
+        importance_scores = torch.tensor(sequence_features['residue_importance'])
+
+        # Find regions with high attention scores
+        threshold = self.attention_threshold
+        potential_sites = torch.where(importance_scores > threshold)[0].tolist()
+
+        # Calculate interaction scores
+        scores = []
+        for site in potential_sites:
+            # Use embedding features to calculate interaction potential
+            site_embedding = embeddings[0, site]
+            interaction_score = torch.mean(site_embedding).item()
+            scores.append(interaction_score)
+
+        return {
+            'sites': potential_sites,
+            'scores': scores
+        }
 
     def analyze_drug_binding(self, sequence, ligand_features=None):
         """Analyze potential drug binding sites and interactions."""

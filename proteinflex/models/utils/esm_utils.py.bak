@@ -20,7 +20,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-import torch
+from proteinflex.models.utils.lazy_imports import torch
 import esm
 from typing import Tuple, List
 import logging
@@ -28,7 +28,7 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-class ESMPredictor:
+class ESMModel:
     def __init__(self):
         try:
             # Load ESM-2 model
@@ -45,6 +45,13 @@ class ESMPredictor:
 
     def predict_structure(self, sequence: str) -> Tuple[torch.Tensor, List[float]]:
         try:
+            if sequence is None:
+                raise ValueError("Input sequence cannot be None")
+            if not isinstance(sequence, str):
+                raise ValueError("Input sequence must be a string")
+            if not sequence:
+                raise ValueError("Input sequence cannot be empty")
+
             # Prepare data
             batch_converter = self.alphabet.get_batch_converter()
             data = [("protein", sequence)]
