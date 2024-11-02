@@ -49,17 +49,19 @@ jobs:
           # Install core Python packages via pip
           python -m pip install --upgrade pip
           pip install Cython wheel setuptools
-          pip install numpy==1.23.5
+
+          # Install specialized packages via conda first
+          conda install -y -c conda-forge numpy=1.23.5
+          conda install -y -c conda-forge mdtraj=1.9.7 openmm=8.0.0 prody=2.4.1 parmed=3.4.3
+
+          # Install remaining Python packages via pip
           pip install scipy==1.9.3
           pip install torch==2.0.1 --index-url https://download.pytorch.org/whl/cpu
           pip install transformers==4.32.0
 
-          # Install specialized packages via conda
-          conda install -y -c conda-forge mdtraj=1.9.7 openmm=8.0.0 prody=2.4.1 parmed=3.4.3
-
           # Install test dependencies and package
           pip install pytest pytest-cov coverage
-          pip install --prefer-binary -r requirements-test.txt
+          pip install --prefer-binary --no-deps -r requirements-test.txt
           pip install -e .
 
       - name: Run tests
