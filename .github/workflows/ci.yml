@@ -66,6 +66,7 @@ jobs:
           # Install ML dependencies
           pip install torch==1.13.1+cpu --extra-index-url https://download.pytorch.org/whl/cpu
           pip install transformers==4.25.1 tokenizers==0.13.2
+          pip install google-generativeai==0.2.0
           # Install testing dependencies
           pip install pytest==7.1.2 pytest-cov==3.0.0 coverage==6.5.0 flake8==5.0.4
           pip install pytest-mock==3.10.0 pytest-asyncio==0.20.3 pytest-timeout==2.1.0
@@ -84,9 +85,14 @@ jobs:
           CUDA_VISIBLE_DEVICES: ""
           OMP_NUM_THREADS: 1
           MKL_NUM_THREADS: 1
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
         run: |
-          # Run tests with coverage
-          pytest tests/ -v --cov=proteinflex --cov-report=xml --import-mode=importlib
+          # Run tests with coverage, skipping API tests if no key available
+          if [ -z "$GOOGLE_API_KEY" ]; then
+            pytest tests/ -v -m "not requires_api" --cov=proteinflex --cov-report=xml --import-mode=importlib
+          else
+            pytest tests/ -v --cov=proteinflex --cov-report=xml --import-mode=importlib
+          fi
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
