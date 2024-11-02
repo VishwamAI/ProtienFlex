@@ -56,13 +56,16 @@ jobs:
         shell: bash -l {0}
         run: |
           # Verify conda environment
-          conda list
+          micromamba list
+          # Ensure environment is activated
+          eval "$(micromamba shell hook --shell=bash)"
+          micromamba activate proteinflex-test-core
           # Install dependencies first
           python -m pip install --upgrade pip
           # Install package without dependencies to avoid rebuilding
           pip install --no-deps -e .
           # Verify installations
-          python -c "import mdtraj; import prody; import openmm; print('Dependencies verified')"
+          python -c "import sys; print(sys.path); import mdtraj; import prody; import openmm; print('Dependencies verified')"
 
       - name: Run tests
         shell: bash -l {0}
