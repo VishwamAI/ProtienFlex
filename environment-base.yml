@@ -1,0 +1,16 @@
+name: proteinflex-env
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  # Core Python and build tools only
+  - python=3.8
+  - pip
+  - setuptools
+  - wheel
+  - make
+  - cmake
+  - gcc
+  - gxx
+  - pkg-config
+  - cython=0.29.32

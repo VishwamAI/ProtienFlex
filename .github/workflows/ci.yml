@@ -44,14 +44,15 @@ jobs:
       - name: Set up conda
         uses: conda-incubator/setup-miniconda@v3
         with:
-          python-version: "3.10"
-          channels: conda-forge,defaults,pytorch
+          python-version: "3.8"
+          channels: conda-forge,defaults
           channel-priority: strict
           activate-environment: proteinflex-env
-          environment-file: environment.yml
           auto-activate-base: false
           auto-update-conda: true
           use-mamba: true
+          create-env-file: environment-base.yml
+          environment-file: false
 
       - name: Verify conda environment
         shell: bash -el {0}
@@ -63,9 +64,19 @@ jobs:
       - name: Install package
         shell: bash -el {0}
         run: |
-          # Verify key dependencies are installed
-          python -c "import numpy; import mdtraj; import prody; import openmm; print('Core dependencies verified')"
-          python -c "import torch; import transformers; print('ML dependencies verified')"
+          # Install scientific dependencies
+          pip install numpy==1.23.5 scipy==1.9.3 pandas==1.5.3 matplotlib==3.6.2 biopython==1.80
+          # Install bioinformatics dependencies
+          pip install mdtraj==1.9.7 openmm==7.7.0 prody==2.0.0
+          # Install ML dependencies
+          pip install torch==1.13.1+cpu --extra-index-url https://download.pytorch.org/whl/cpu
+          pip install transformers==4.25.1 tokenizers==0.13.2
+          # Install testing dependencies
+          pip install pytest==7.1.2 pytest-cov==3.0.0 coverage==6.5.0 flake8==5.0.4
+          pip install pytest-mock==3.10.0 pytest-asyncio==0.20.3 pytest-timeout==2.1.0
+          pip install pytest-xdist==3.1.0 mock==5.0.1 pytest-env==0.8.1 pytest-randomly==3.12.0
+          # Install package in editable mode
+          pip install -e .
 
       - name: Run tests
         shell: bash -el {0}
@@ -106,20 +117,28 @@ jobs:
       - name: Set up conda
         uses: conda-incubator/setup-miniconda@v3
         with:
-          python-version: "3.10"
-          channels: conda-forge,defaults,pytorch
+          python-version: "3.8"
+          channels: conda-forge,defaults
           channel-priority: strict
           activate-environment: proteinflex-env
-          environment-file: environment.yml
           auto-activate-base: false
           auto-update-conda: true
           use-mamba: true
+          create-env-file: environment-base.yml
+          environment-file: false
+
+      - name: Install dependencies
+        shell: bash -el {0}
+        run: |
+          # Install scientific dependencies
+          pip install numpy==1.23.5 scipy==1.9.3 pandas==1.5.3 matplotlib==3.6.2 biopython==1.80
+          # Install build dependencies
+          python -m pip install --upgrade pip build wheel setuptools
 
       - name: Build package
         shell: bash -el {0}
         run: |
           # Build package
-          python -m pip install --upgrade pip build wheel
           python -m build
           python setup.py bdist_wheel
 
