@@ -35,12 +35,12 @@ dependencies:
   - coverage=6.5.0
   - flake8=5.0.4
 
-  # Deep learning dependencies
-  - pytorch-cpu=1.13.1
-  - transformers=4.25.1
-  - tokenizers=0.13.2
-
   - pip:
+    # Deep learning dependencies
+    - torch==1.13.1+cpu --extra-index-url https://download.pytorch.org/whl/cpu
+    - transformers==4.25.1
+    - tokenizers==0.13.2
+
     # Additional dependencies
     - google-cloud-aiplatform==1.21.0
 
@@ -54,6 +54,5 @@ dependencies:
     - pytest-randomly==3.12.0
     - coverage-badge==1.1.0
 
-  # Install package in editable mode
-  - pip:
+    # Install package in editable mode
     - -e .
