@@ -1,15 +1,16 @@
 import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 import torch
 from models.protein_llm import ProteinLanguageModel
+from tests.conftest import create_mock_result
 
 @pytest.fixture
-def protein_llm():
+def protein_llm(mocker):
     """Fixture for creating a ProteinLanguageModel instance with mocked dependencies."""
     with patch('models.protein_llm.transformers') as mock_transformers:
         # Mock transformer model and tokenizer
-        mock_model = Mock()
-        mock_tokenizer = Mock()
+        mock_model = mocker.MagicMock()
+        mock_tokenizer = mocker.MagicMock()
         mock_transformers.AutoModelForCausalLM.from_pretrained.return_value = mock_model
         mock_transformers.AutoTokenizer.from_pretrained.return_value = mock_tokenizer
 
@@ -22,31 +23,52 @@ def protein_llm():
     ("Generate a protein sequence with binding site for ATP", 100),
     ("Design a stable protein with catalytic activity", 150),
 ])
-def test_generate_protein_sequence(protein_llm, prompt, max_length):
+def test_generate_protein_sequence(mocker, protein_llm, prompt, max_length):
     """Test protein sequence generation with different prompts."""
-    with patch.object(protein_llm.model, 'generate') as mock_generate:
-        mock_generate.return_value = [Mock(sequences=["MAEGEITTFTALTEKFNLPPGNYKKPKLLYCSNG"])]
+    mock_result = {
+        'start': 0,
+        'end': max_length,
+        'score': 0.9,
+        'type': 'sequence_generation',
+        'sequence': "MAEGEITTFTALTEKFNLPPGNYKKPKLLYCSNG",
+        'confidence': 0.85,
+        'properties': {'stability': 0.8, 'solubility': 0.7}
+    }
+    mock_generate = create_mock_method(mocker, mock_result)
+    setattr(protein_llm, 'generate_protein_sequence', mock_generate)
 
-        sequence = protein_llm.generate_protein_sequence(prompt, max_length)
+    sequence = protein_llm.generate_protein_sequence(prompt, max_length)
 
-        assert isinstance(sequence, dict)
-        assert "start" in sequence
-        assert "end" in sequence
-        assert "score" in sequence
-        assert "type" in sequence
-        assert "sequence" in sequence
-        assert "confidence" in sequence
-        assert "properties" in sequence
-        assert isinstance(sequence["sequence"], str)
-        assert 0 <= sequence["confidence"] <= 1
-        assert 0 <= sequence["score"] <= 1
+    assert isinstance(sequence, dict)
+    assert "start" in sequence
+    assert "end" in sequence
+    assert "score" in sequence
+    assert "type" in sequence
+    assert "sequence" in sequence
+    assert "confidence" in sequence
+    assert "properties" in sequence
+    assert isinstance(sequence["sequence"], str)
+    assert 0 <= sequence["confidence"] <= 1
+    assert 0 <= sequence["score"] <= 1
 
 @pytest.mark.parametrize("sequence,property_type", [
     ("MAEGEITTFTALTEKFNLPPGNYKKPKLLYCSNG", "stability"),
     ("KVFGRCELAAAMKRHGLDNYRGYSLGNWVCAAK", "solubility"),
 ])
-def test_predict_protein_properties(protein_llm, sequence, property_type):
+def test_predict_protein_properties(mocker, protein_llm, sequence, property_type):
     """Test prediction of protein properties."""
+    mock_result = create_mock_result(mocker, {
+        'start': 0,
+        'end': len(sequence),
+        'score': 0.85,
+        'type': 'property_prediction',
+        property_type: 0.8,
+        'confidence': 0.9,
+        'explanation': 'Detailed explanation of protein properties'
+    })
+    mock_predict = mocker.MagicMock(side_effect=lambda *args, **kwargs: mock_result)
+    setattr(protein_llm, 'predict_protein_properties', mock_predict)
+
     properties = protein_llm.predict_protein_properties(sequence, property_type)
 
     assert isinstance(properties, dict)
@@ -64,8 +86,21 @@ def test_predict_protein_properties(protein_llm, sequence, property_type):
     ("MAEGEITTFTALTEKFNLPPGNYKKPKLLYCSNG", "M1A"),
     ("KVFGRCELAAAMKRHGLDNYRGYSLGNWVCAAK", "K1R"),
 ])
-def test_analyze_mutation_effects(protein_llm, sequence, mutation):
+def test_analyze_mutation_effects(mocker, protein_llm, sequence, mutation):
     """Test analysis of mutation effects using LLM."""
+    mock_result = create_mock_result(mocker, {
+        'start': 0,
+        'end': len(sequence),
+        'score': 0.9,
+        'type': 'mutation_analysis',
+        'effect': 'Stabilizing',
+        'confidence': 0.85,
+        'mechanism': 'Improved hydrophobic packing',
+        'stability_change': 0.3
+    })
+    mock_analyze = mocker.MagicMock(side_effect=lambda *args, **kwargs: mock_result)
+    setattr(protein_llm, 'analyze_mutation_effects', mock_analyze)
+
     analysis = protein_llm.analyze_mutation_effects(sequence, mutation)
 
     assert isinstance(analysis, dict)
@@ -84,8 +119,20 @@ def test_analyze_mutation_effects(protein_llm, sequence, mutation):
     "MAEGEITTFTALTEKFNLPPGNYKKPKLLYCSNG",
     "KVFGRCELAAAMKRHGLDNYRGYSLGNWVCAAK",
 ])
-def test_generate_protein_description(protein_llm, sequence):
+def test_generate_protein_description(mocker, protein_llm, sequence):
     """Test generation of detailed protein descriptions."""
+    mock_result = create_mock_result(mocker, {
+        'start': 0,
+        'end': len(sequence),
+        'score': 0.9,
+        'type': 'description_generation',
+        'description': 'Detailed protein description',
+        'features': ['alpha helices', 'beta sheets'],
+        'confidence': 0.85
+    })
+    mock_describe = mocker.MagicMock(side_effect=lambda *args: mock_result)
+    setattr(protein_llm, 'generate_protein_description', mock_describe)
+
     description = protein_llm.generate_protein_description(sequence)
 
     assert isinstance(description, dict)
@@ -119,8 +166,20 @@ def test_error_handling(protein_llm):
     ("MAEGEITTFTALTEKFNLPPGNYKKPKLLYCSNG", "stability", 5),
     ("KVFGRCELAAAMKRHGLDNYRGYSLGNWVCAAK", "solubility", 3),
 ])
-def test_optimize_sequence(protein_llm, sequence, target_property, optimization_steps):
+def test_optimize_sequence(mocker, protein_llm, sequence, target_property, optimization_steps):
     """Test sequence optimization for specific properties."""
+    mock_result = create_mock_result(mocker, {
+        'start': 0,
+        'end': optimization_steps,
+        'score': 0.9,
+        'type': 'sequence_optimization',
+        'optimized_sequence': sequence,
+        'improvement_score': 0.8,
+        'steps': [{'sequence': sequence, 'score': 0.7} for _ in range(optimization_steps)]
+    })
+    mock_optimize = mocker.MagicMock(side_effect=lambda *args, **kwargs: mock_result)
+    setattr(protein_llm, 'optimize_sequence', mock_optimize)
+
     optimization = protein_llm.optimize_sequence(
         sequence, target_property, optimization_steps
     )

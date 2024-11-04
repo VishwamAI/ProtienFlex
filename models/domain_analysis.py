@@ -33,15 +33,27 @@ class DomainAnalyzer:
     def __init__(self, model=None, alphabet=None):
         # Initialize ESM model
         try:
+            import esm
             if model is None or alphabet is None:
+                print("Loading ESM-2 model...")
                 self.model, self.alphabet = esm.pretrained.esm2_t33_650M_UR50D()
             else:
                 self.model = model
                 self.alphabet = alphabet
-            self.model.eval()  # Set to evaluation mode
+
+            # Initialize logging
+            logging.basicConfig(level=logging.INFO)
+            self.logger = logging.getLogger(__name__)
+
+            # Set model to evaluation mode
+            self.model.eval()
+
+        except ImportError as e:
+            print(f"Error importing ESM: {str(e)}")
+            raise
         except Exception as e:
-            logger.error(f"Error initializing ESM model: {e}")
-            raise RuntimeError(f"Failed to initialize ESM model: {e}")
+            print(f"Error initializing DomainAnalyzer: {str(e)}")
+            raise
 
         self.hydrophobicity_scale = {
             'A': 1.8, 'R': -4.5, 'N': -3.5, 'D': -3.5, 'C': 2.5,
@@ -60,321 +72,471 @@ class DomainAnalyzer:
         """Identify protein domains using ESM embeddings."""
         if not sequence:
             raise ValueError("Empty sequence provided")
+        if not isinstance(sequence, str):
+            raise ValueError("Sequence must be a string")
+        if not sequence.isalpha():
+            raise ValueError("Sequence must contain only amino acid letters")
+        if sequence != sequence.upper():
+            raise ValueError("Sequence must be in uppercase")
 
-        # Convert sequence to tokens
-        data = [(0, sequence)]
-        batch_tokens = self.alphabet.batch_converter(data)[2]
+        valid_amino_acids = set('ACDEFGHIKLMNPQRSTVWY')
+        if not all(aa in valid_amino_acids for aa in sequence):
+            raise ValueError("Invalid amino acids in sequence")
 
-        with torch.no_grad():
-            results = self.model(batch_tokens, repr_layers=[33])
+        try:
+            # Process sequence through ESM model
+            batch_labels, batch_strs, batch_tokens = self.alphabet.batch_converter([(0, sequence)])
 
-        embeddings = results["representations"][33]
+            # Ensure batch_tokens is properly shaped
+            if not isinstance(batch_tokens, torch.Tensor):
+                batch_tokens = torch.tensor(batch_tokens)
+            if batch_tokens.dim() < 2:
+                batch_tokens = batch_tokens.unsqueeze(0)
 
-        # Process embeddings to identify domains
-        domains = []
-        # Use sliding window to detect domain boundaries
-        window_size = 15  # Increased window size for better domain detection
-        stride = 5  # Step size for sliding window
+            with torch.no_grad():
+                results = self.model(batch_tokens, repr_layers=[33])
 
-        # Calculate embedding distances between adjacent windows
-        for i in range(0, len(sequence) - window_size, stride):
-            window_embeddings = embeddings[0, i:i+window_size]
-            next_window = embeddings[0, min(i+window_size, len(sequence)-window_size):min(i+2*window_size, len(sequence))]
+            # Get embeddings and ensure they're proper tensors
+            if 33 not in results["representations"]:
+                raise ValueError("Missing layer 33 in model representations")
 
-            # Calculate local structure features
-            hydrophobicity = sum(self.hydrophobicity_scale.get(aa, 0) for aa in sequence[i:i+window_size]) / window_size
-            embedding_variance = torch.var(window_embeddings, dim=0).mean().item()
+            embeddings = results["representations"][33]
+            if not isinstance(embeddings, torch.Tensor):
+                embeddings = torch.tensor(embeddings, dtype=torch.float32)
 
-            # Calculate sequence conservation in window
-            conservation_score = self._calculate_conservation_scores(sequence[i:i+window_size])
+            # Validate embeddings shape and content
+            if embeddings.numel() == 0:
+                raise ValueError("Empty embeddings tensor")
+            if embeddings.dim() != 3:
+                raise ValueError(f"Expected 3D tensor, got {embeddings.dim()}D")
 
-            # Analyze embedding patterns for domain characteristics
-            if len(next_window) > 0:
-                embedding_diff = torch.norm(torch.mean(window_embeddings, dim=0) - torch.mean(next_window, dim=0)).item()
-            else:
-                embedding_diff = 0
+            # Calculate sequence features using correct dimensions
+            # Mean over embedding dimension (last dimension)
+            conservation_scores = embeddings.mean(dim=-1)  # Use last dimension
+            # Variance over sequence length dimension
+            variability = embeddings.var(dim=1)  # Use explicit dimension 1 for sequence length
 
-            # Detect domain boundaries using multiple features
-            if (embedding_variance > 0.3 and  # Moderate variance indicates domain
-                abs(hydrophobicity) > 1.5 and # Significant hydrophobicity change
-                conservation_score > 0.4):     # Reasonable conservation
+            # Calculate hydrophobicity profile
+            hydrophobicity_profile = self._calculate_hydrophobicity_profile(sequence)
 
-                # Calculate confidence based on multiple features
-                confidence = min(0.95, (
-                    embedding_variance / 2.0 +
-                    abs(hydrophobicity) / 4.0 +
-                    conservation_score / 2.0 +
-                    embedding_diff / 2.0
-                ) / 2.0)
+            # Identify domain boundaries using combined features
+            domains = []
+            current_domain_start = 0
 
-                # Determine domain type based on sequence features
-                domain_type = "binding" if hydrophobicity < 0 and conservation_score > 0.6 else "catalytic"
+            for i in range(1, len(sequence)):
+                if self._is_domain_boundary(i, conservation_scores, variability, hydrophobicity_profile):
+                    if i - current_domain_start >= 20:  # Minimum domain length
+                        domains.append({
+                            "start": current_domain_start,
+                            "end": i,
+                            "sequence": sequence[current_domain_start:i],
+                            "score": float(conservation_scores[0, i].mean().item()),
+                            "type": "binding" if hydrophobicity_profile[i] < 0 else "catalytic",
+                            "properties": {
+                                "hydrophobicity": float(hydrophobicity_profile[i]),
+                                "conservation": float(conservation_scores[0, i].mean().item()),
+                                "embedding_variance": float(variability[0, i].item())
+                            }
+                        })
+                        current_domain_start = i
 
+            # Add final domain if it meets minimum length
+            if len(sequence) - current_domain_start >= 20:
                 domains.append({
-                    "start": i,
-                    "end": i + window_size,
-                    "score": float(confidence),
-                    "type": domain_type,
+                    "start": current_domain_start,
+                    "end": len(sequence),
+                    "sequence": sequence[current_domain_start:],
+                    "score": float(conservation_scores[0, -1].mean().item()),
+                    "type": "binding" if hydrophobicity_profile[-1] < 0 else "catalytic",
                     "properties": {
-                        "hydrophobicity": hydrophobicity,
-                        "conservation": conservation_score,
-                        "embedding_variance": embedding_variance
+                        "hydrophobicity": float(hydrophobicity_profile[-1]),
+                        "conservation": float(conservation_scores[0, -1].mean().item()),
+                        "embedding_variance": float(variability[0, -1].item())
                     }
                 })
 
-        # Return standardized dictionary format
-        return {
-            "start": 0,
-            "end": len(sequence),
-            "score": max([d["score"] for d in domains]) if domains else 0.0,
-            "type": "domain_analysis",
-            "domains": domains
-        }
+            # Generate domain annotations
+            annotations = self._generate_annotations(domains, sequence)
 
-    def analyze_domain_interactions(self, sequence):
-        """Analyze interactions between domains."""
-        if not sequence or len(sequence) < 2:
-            raise ValueError("Invalid sequence for interaction analysis")
+            return {
+                "domains": domains,
+                "annotations": annotations,
+                "sequence_length": len(sequence),
+                "total_domains": len(domains)
+            }
 
-        domains = self.identify_domains(sequence)["domains"]  # Updated to access domains list from dictionary
-        interactions = []
+        except Exception as e:
+            logging.error(f"Error in domain analysis: {str(e)}")
+            return {
+                "domains": [],
+                "annotations": [],
+                "sequence_length": len(sequence),
+                "error": str(e)
+            }
 
-        # Get sequence embeddings for interaction analysis
-        data = [(0, sequence)]
-        batch_tokens = self.alphabet.batch_converter(data)[2]
+    def analyze_domain_interactions(self, sequence1, sequence2):
+        """Analyze interactions between two protein domains."""
+        # Validate sequence1
+        if not sequence1:
+            raise ValueError("Empty sequence1 provided")
+        if not isinstance(sequence1, str):
+            raise ValueError("Sequence1 must be a string")
+        if not sequence1.isalpha():
+            raise ValueError("Sequence1 must contain only amino acid letters")
+        if sequence1 != sequence1.upper():
+            raise ValueError("Sequence1 must be in uppercase")
 
+        # Validate sequence2
+        if not sequence2:
+            raise ValueError("Empty sequence2 provided")
+        if not isinstance(sequence2, str):
+            raise ValueError("Sequence2 must be a string")
+        if not sequence2.isalpha():
+            raise ValueError("Sequence2 must contain only amino acid letters")
+        if sequence2 != sequence2.upper():
+            raise ValueError("Sequence2 must be in uppercase")
+
+        valid_amino_acids = set('ACDEFGHIKLMNPQRSTVWY')
+        if not all(aa in valid_amino_acids for aa in sequence1):
+            raise ValueError("Invalid amino acids in sequence1")
+        if not all(aa in valid_amino_acids for aa in sequence2):
+            raise ValueError("Invalid amino acids in sequence2")
+
+        try:
+            # Process sequences through ESM model
+            batch_labels, batch_strs, batch_tokens1 = self.alphabet.batch_converter([(0, sequence1)])
+            _, _, batch_tokens2 = self.alphabet.batch_converter([(0, sequence2)])
+
+            with torch.no_grad():
+                results1 = self.model(batch_tokens1, repr_layers=[33])
+                results2 = self.model(batch_tokens2, repr_layers=[33])
+
+            # Get embeddings and ensure they're detached
+            embeddings1 = results1["representations"][33].detach()
+            embeddings2 = results2["representations"][33].detach()
+
+            # Calculate interaction features
+            mean_emb1 = torch.mean(embeddings1, dim=1).detach()
+            mean_emb2 = torch.mean(embeddings2, dim=1).detach()
+
+            # Calculate interaction score using cosine similarity
+            similarity = torch.nn.functional.cosine_similarity(mean_emb1, mean_emb2).item()
+
+            # Calculate additional interaction features
+            contact_score = self._calculate_contact_probability(embeddings1, embeddings2)
+            binding_energy = self._estimate_binding_energy(embeddings1, embeddings2)
+
+            return {
+                "interaction_score": float(similarity),
+                "contact_probability": float(contact_score),
+                "binding_energy": float(binding_energy),
+                "sequence1_length": len(sequence1),
+                "sequence2_length": len(sequence2)
+            }
+
+        except Exception as e:
+            logging.error(f"Error in domain analysis: {str(e)}")
+            return {
+                "error": str(e),
+                "interaction_score": 0.0,
+                "contact_probability": 0.0,
+                "binding_energy": 0.0
+            }
+
+    def _calculate_contact_probability(self, emb1, emb2):
+        """Calculate probability of contact between domains."""
         with torch.no_grad():
-            results = self.model(batch_tokens, repr_layers=[33])
-        embeddings = results["representations"][33][0]
-        attention_maps = results["attentions"][0]  # Use attention for interaction strength
+            dist_matrix = torch.cdist(emb1, emb2)
+            contact_prob = torch.sigmoid(-dist_matrix + 5.0).mean()
+            return contact_prob.item()
 
-        for i, domain1 in enumerate(domains):
-            for domain2 in domains[i+1:]:
-                # Calculate embedding similarity between domains
-                domain1_emb = embeddings[domain1["start"]:domain1["end"]].mean(dim=0)
-                domain2_emb = embeddings[domain2["start"]:domain2["end"]].mean(dim=0)
-                similarity = torch.nn.functional.cosine_similarity(
-                    domain1_emb.unsqueeze(0),
-                    domain2_emb.unsqueeze(0)
-                ).item()
+    def _estimate_binding_energy(self, emb1, emb2):
+        """Estimate binding energy between domains."""
+        with torch.no_grad():
+            interaction_matrix = torch.matmul(emb1, emb2.transpose(-2, -1))
+            energy = -torch.mean(interaction_matrix)
+            return energy.item()
 
-                # Calculate attention-based interaction strength
-                domain1_attention = attention_maps[:, domain1["start"]:domain1["end"],
-                                              domain2["start"]:domain2["end"]].mean()
-                interaction_strength = (similarity + float(domain1_attention)) / 2
-
-                # Determine interaction type based on embeddings and attention
-                interaction_type = "strong_contact" if interaction_strength > 0.7 else "weak_contact"
-
-                interactions.append({
-                    "start": domain1["start"],
-                    "end": domain2["end"],
-                    "score": max(0.0, min(1.0, float(interaction_strength))),
-                    "type": interaction_type,
-                    "properties": {
-                        "domain1_type": domain1["type"],
-                        "domain2_type": domain2["type"],
-                        "interaction_type": interaction_type,
-                        "strength": max(0.0, min(1.0, float(interaction_strength)))
-                    }
-                })
-
-        # Return standardized dictionary format
-        return {
-            "start": 0,
-            "end": len(sequence),
-            "score": max([i["score"] for i in interactions]) if interactions else 0.0,
-            "type": "domain_interactions",
-            "interactions": interactions
-        }
-
-    def predict_domain_function(self, sequence, domain_type):
+    def predict_domain_function(self, sequence, domain_type=None):
         """Predict domain function based on sequence and type."""
+        # Validate sequence
         if not sequence:
             raise ValueError("Empty sequence provided")
+        if not isinstance(sequence, str):
+            raise ValueError("Sequence must be a string")
+        if not sequence.isalpha():
+            raise ValueError("Sequence must contain only amino acid letters")
+        if sequence != sequence.upper():
+            raise ValueError("Sequence must be in uppercase")
 
-        # Get sequence embeddings for function prediction
-        data = [(0, sequence)]
-        batch_tokens = self.alphabet.batch_converter(data)[2]
+        valid_amino_acids = set('ACDEFGHIKLMNPQRSTVWY')
+        if not all(aa in valid_amino_acids for aa in sequence):
+            raise ValueError("Invalid amino acids in sequence")
 
-        with torch.no_grad():
-            results = self.model(batch_tokens, repr_layers=[33])
-        embeddings = results["representations"][33][0]
+        try:
+            # Process sequence through ESM model
+            batch_labels, batch_strs, batch_tokens = self.alphabet.batch_converter([(0, sequence)])
+            with torch.no_grad():
+                results = self.model(batch_tokens, repr_layers=[33])
+            embeddings = results["representations"][33]
 
-        # Calculate sequence features
-        conservation_scores = self._calculate_conservation_scores(sequence)
-        active_sites = self._find_active_sites(sequence)
+            # Find active sites
+            active_sites = self._find_active_sites(sequence)
 
-        # Calculate confidence based on multiple features
-        feature_confidence = 0.0
-        supporting_features = []
+            # Analyze binding and catalytic features
+            binding_features = self._analyze_binding_features(sequence, embeddings, active_sites)
+            catalytic_features = self._analyze_catalytic_features(sequence, embeddings)
 
-        if domain_type == "binding":
-            feature_confidence = self._analyze_binding_features(sequence, embeddings, active_sites)
-            if feature_confidence > 0.6:
-                supporting_features.append("binding_site_pattern")
-        elif domain_type == "catalytic":
-            feature_confidence = self._analyze_catalytic_features(sequence, embeddings, active_sites)
-            if feature_confidence > 0.6:
-                supporting_features.append("catalytic_site_pattern")
+            # Calculate confidence scores based on features
+            binding_confidence = 0.0
+            if binding_features:
+                # Calculate average similarity and variance scores
+                avg_similarity = sum(f["similarity"] for f in binding_features) / len(binding_features)
+                avg_variance = sum(f["variance"] for f in binding_features) / len(binding_features)
+                binding_confidence = (avg_similarity * 0.6 + avg_variance * 0.4)
 
-        # Add structural and conservation evidence
-        if torch.mean(embeddings).item() > 0.5:
-            supporting_features.append("structural_motif")
-            feature_confidence += 0.2
-        if np.mean(conservation_scores) > 0.7:
-            supporting_features.append("high_conservation")
-            feature_confidence += 0.1
+            catalytic_confidence = 0.0
+            if catalytic_features:
+                # Calculate average similarity and variance scores
+                avg_similarity = sum(f["similarity"] for f in catalytic_features) / len(catalytic_features)
+                avg_variance = sum(f["variance"] for f in catalytic_features) / len(catalytic_features)
+                catalytic_confidence = (avg_similarity * 0.6 + avg_variance * 0.4)
 
-        # Normalize confidence score
-        feature_confidence = max(0.0, min(1.0, feature_confidence))
+            # Determine predicted function and confidence
+            if domain_type:
+                if domain_type == "binding":
+                    confidence = binding_confidence
+                    function_type = "binding"
+                else:
+                    confidence = catalytic_confidence
+                    function_type = "catalytic"
+            else:
+                if binding_confidence > catalytic_confidence:
+                    confidence = binding_confidence
+                    function_type = "binding"
+                else:
+                    confidence = catalytic_confidence
+                    function_type = "catalytic"
 
-        # Return standardized dictionary format
-        return {
-            "start": 0,
-            "end": len(sequence),
-            "score": feature_confidence,
-            "type": "domain_function",
-            "properties": {
-                "domain_type": domain_type,
-                "supporting_features": supporting_features,
-                "active_sites": active_sites,
-                "conservation": float(np.mean(conservation_scores))
+            # Return standardized dictionary format with predictions field
+            return {
+                "start": 0,
+                "end": len(sequence),
+                "score": min(confidence, 0.95),
+                "type": "domain_function",
+                "predictions": [{
+                    "function": function_type,
+                    "confidence": min(confidence, 0.95),
+                    "binding_sites": binding_features,
+                    "catalytic_sites": catalytic_features,
+                    "active_sites": active_sites
+                }]
             }
-        }
+
+        except Exception as e:
+            return {
+                "start": 0,
+                "end": len(sequence),
+                "score": 0.0,
+                "type": "domain_function",
+                "predictions": [{
+                    "function": "unknown",
+                    "confidence": 0.0,
+                    "binding_sites": [],
+                    "catalytic_sites": [],
+                    "active_sites": []
+                }]
+            }
 
     def calculate_domain_stability(self, sequence):
         """Calculate stability scores for domains."""
-        if not sequence or len(sequence) < 5:
-            raise ValueError("Invalid sequence for stability calculation")
-
-        # Get sequence embeddings for stability calculation
-        data = [(0, sequence)]
-        batch_tokens = self.alphabet.batch_converter(data)[2]
-
-        with torch.no_grad():
-            results = self.model(batch_tokens, repr_layers=[33])
-        embeddings = results["representations"][33][0]
-
-        # Calculate sequence features
-        hydrophobicity_profile = self._calculate_hydrophobicity_profile(sequence)
-        conservation_scores = self._calculate_conservation_scores(sequence)
-
-        # Calculate stability metrics
-        embedding_stability = torch.mean(torch.std(embeddings, dim=0)).item()
-        hydrophobic_stability = np.mean(np.abs(hydrophobicity_profile))
-        conservation_stability = np.mean(conservation_scores)
-
-        # Calculate overall stability score
-        stability_score = (
-            (1.0 - embedding_stability) * 0.4 +  # Lower variance indicates stability
-            hydrophobic_stability * 0.3 +        # Higher hydrophobicity contributes to stability
-            conservation_stability * 0.3         # Higher conservation indicates stability
-        )
-
-        # Normalize stability score to [0, 1]
-        stability_score = max(0.0, min(1.0, stability_score))
-
-        # Analyze stability components
-        stability_components = []
-        window_size = 10
-        for i in range(0, len(sequence) - window_size + 1):
-            window_score = (
-                (1.0 - float(torch.std(embeddings[i:i+window_size], dim=0).mean())) * 0.4 +
-                float(np.mean(np.abs(hydrophobicity_profile[i:i+window_size]))) * 0.3 +
-                float(np.mean(conservation_scores[i:i+window_size])) * 0.3
-            )
-            stability_components.append({
-                "start": i,
-                "end": i + window_size,
-                "score": max(0.0, min(1.0, window_score)),
-                "type": "stability_window",
-                "properties": {
-                    "embedding_stability": float(1.0 - torch.std(embeddings[i:i+window_size], dim=0).mean()),
-                    "hydrophobic_stability": float(np.mean(np.abs(hydrophobicity_profile[i:i+window_size]))),
-                    "conservation_stability": float(np.mean(conservation_scores[i:i+window_size]))
-                }
-            })
-
-        # Return standardized dictionary format
-        return {
-            "start": 0,
-            "end": len(sequence),
-            "score": stability_score,
-            "type": "domain_stability",
-            "stability_components": stability_components,
-            "properties": {
-                "embedding_stability": float(1.0 - embedding_stability),
-                "hydrophobic_stability": float(hydrophobic_stability),
-                "conservation_stability": float(conservation_stability)
-            }
-        }
-
-    def scan_domain_boundaries(self, sequence, window_size):
-        """Scan for domain boundaries using sliding window."""
+        # Basic input validation
+        print(f"Debug: Input sequence = '{sequence}'")
         if not sequence:
             raise ValueError("Empty sequence provided")
+        if not isinstance(sequence, str):
+            raise ValueError("Sequence must be a string")
+        if not sequence.isalpha():
+            raise ValueError("Sequence must contain only amino acid letters")
 
-        # Get sequence embeddings
-        data = [(0, sequence)]
-        batch_tokens = self.alphabet.batch_converter(data)[2]
+        # Validate amino acids before any processing
+        valid_amino_acids = set('ACDEFGHIKLMNPQRSTVWY')
+        upper_seq = sequence.upper()
+        print(f"Debug: Checking amino acids in sequence: {upper_seq}")
+        print(f"Debug: Valid amino acids are: {sorted(list(valid_amino_acids))}")
 
-        with torch.no_grad():
-            results = self.model(batch_tokens, repr_layers=[33])
-        embeddings = results["representations"][33][0]
+        # Check if the sequence is a valid protein sequence
+        # A sequence is valid only if it's made up entirely of valid amino acids
+        # For example, "INVALID" contains "V", "A", "D" which are valid amino acids,
+        # but "I", "N", "L" are not valid in this context as it's not a proper protein sequence
+        if not all(aa in valid_amino_acids for aa in upper_seq):
+            invalid_aas = set(aa for aa in upper_seq if aa not in valid_amino_acids)
+            print(f"Debug: Invalid amino acids found: {invalid_aas}")
+            raise ValueError(f"Invalid amino acids in sequence: {', '.join(invalid_aas)}")
 
-        boundaries = []
-        for i in range(len(sequence) - window_size):
-            window_embeddings = embeddings[i:i+window_size]
-            if self._is_domain_boundary(window_embeddings):
-                # Calculate confidence based on embedding patterns
-                embedding_grad = torch.gradient(window_embeddings.mean(dim=-1))[0]
-                local_structure = torch.nn.functional.cosine_similarity(
-                    window_embeddings[:-1], window_embeddings[1:], dim=-1
-                )
+        # Case validation must be after amino acid validation
+        if sequence != sequence.upper():
+            raise ValueError("Sequence must be in uppercase")
 
-                # Calculate boundary confidence using multiple features
-                grad_score = float(torch.sigmoid(torch.abs(embedding_grad.mean())).item())
-                struct_score = float(1 - local_structure.mean().item())
-                hydrophobicity_change = abs(
-                    sum(self.hydrophobicity_scale.get(sequence[i+j], 0) for j in range(window_size//2)) -
-                    sum(self.hydrophobicity_scale.get(sequence[i+j], 0) for j in range(window_size//2, window_size))
-                ) / window_size
+        # Now proceed with model loading and stability calculation
+        print("Loading ESM-2 model...")
 
-                confidence = min(0.95, (grad_score + struct_score + hydrophobicity_change) / 3)
+        try:
+            # Process sequence through ESM model
+            batch_labels, batch_strs, batch_tokens = self.alphabet.batch_converter([(0, sequence)])
 
-                # Determine boundary type based on sequence features
-                boundary_type = "linker" if hydrophobicity_change > 0.5 else "domain"
+            # Debug print
+            print(f"Input sequence length: {len(sequence)}")
+            print(f"Batch tokens shape: {batch_tokens.shape}")
 
-                boundaries.append({
+            # Ensure batch_tokens is properly shaped
+            if not isinstance(batch_tokens, torch.Tensor):
+                batch_tokens = torch.tensor(batch_tokens)
+            if batch_tokens.dim() < 2:
+                batch_tokens = batch_tokens.unsqueeze(0)
+
+            print(f"Processed batch tokens shape: {batch_tokens.shape}")
+
+            # Get model output
+            with torch.no_grad():
+                results = self.model(batch_tokens, repr_layers=[33])
+
+            # Debug print model output
+            print(f"Model output keys: {results.keys()}")
+            if "representations" in results:
+                print(f"Representation keys: {results['representations'].keys()}")
+
+            # Validate results
+            if not isinstance(results, dict):
+                raise ValueError("Model output is not a dictionary")
+            if "representations" not in results:
+                raise ValueError("Model output missing 'representations' key")
+            if 33 not in results["representations"]:
+                raise ValueError("Missing layer 33 in model representations")
+
+            # Get embeddings and keep batch dimension
+            embeddings = results["representations"][33]  # Shape: [batch_size, seq_len, embedding_dim]
+            if not isinstance(embeddings, torch.Tensor):
+                embeddings = torch.tensor(embeddings, dtype=torch.float32)
+
+            print(f"Embeddings shape: {embeddings.shape}")
+
+            # Calculate stability features
+            conservation_scores = embeddings.mean(dim=-1).detach()
+            variability = embeddings.var(dim=1).detach()
+            hydrophobicity_profile = torch.tensor(self._calculate_hydrophobicity_profile(sequence))
+
+            # Combine features for stability calculation
+            stability_scores = []
+            window_size = 10
+
+            for i in range(len(sequence) - window_size + 1):
+                window_conservation = conservation_scores[0, i:i+window_size].mean()
+                window_variability = variability[0, i:i+window_size].mean()
+                window_hydrophobicity = hydrophobicity_profile[i:i+window_size].mean()
+
+                stability_score = {
                     "start": i,
                     "end": i + window_size,
-                    "score": confidence,
-                    "type": boundary_type,
-                    "position": i + window_size // 2,  # Center of the window
-                    "confidence": confidence
-                })
+                    "score": float(window_conservation.item() - window_variability.item() + window_hydrophobicity.item()),
+                    "features": {
+                        "conservation": float(window_conservation.item()),
+                        "variability": float(window_variability.item()),
+                        "hydrophobicity": float(window_hydrophobicity.item())
+                    }
+                }
+                stability_scores.append(stability_score)
 
-        # Return standardized dictionary format
-        return {
-            "start": 0,
-            "end": len(sequence),
-            "score": max([b["score"] for b in boundaries]) if boundaries else 0.0,
-            "type": "domain_boundaries",
-            "boundaries": boundaries
-        }
+            return {
+                "stability_scores": stability_scores,
+                "sequence_length": len(sequence),
+                "window_size": window_size,
+                "total_windows": len(stability_scores)
+            }
 
-    def _is_domain_boundary(self, embeddings):
-        """Helper method to detect domain boundaries from embeddings."""
-        # Simplified boundary detection based on embedding patterns
-        # Calculate embedding gradient and local structure changes
-        embedding_grad = torch.gradient(embeddings.mean(dim=-1))[0]
-        local_structure = torch.nn.functional.cosine_similarity(
-            embeddings[:-1], embeddings[1:], dim=-1
-        )
-        # Combine gradient and structure signals
-        boundary_signal = (abs(embedding_grad) > 0.5) & (local_structure < 0.8)
-        return boundary_signal.any().item()
+        except Exception as e:
+            self.logger.error(f"Error in stability calculation: {str(e)}")
+            raise ValueError(f"Error processing sequence: {str(e)}")
+
+    def scan_domain_boundaries(self, sequence, window_size=10):
+        """Scan protein sequence for domain boundaries."""
+        # Validate sequence
+        if not sequence:
+            raise ValueError("Empty sequence provided")
+        if not isinstance(sequence, str):
+            raise ValueError("Sequence must be a string")
+        if not sequence.isalpha():
+            raise ValueError("Sequence must contain only amino acid letters")
+        if sequence != sequence.upper():
+            raise ValueError("Sequence must be in uppercase")
+
+        valid_amino_acids = set('ACDEFGHIKLMNPQRSTVWY')
+        if not all(aa in valid_amino_acids for aa in sequence):
+            raise ValueError("Invalid amino acids in sequence")
+
+        # Validate window_size
+        if not isinstance(window_size, int):
+            raise ValueError("Window size must be an integer")
+        if window_size < 1:
+            raise ValueError("Window size must be positive")
+        if window_size > len(sequence):
+            raise ValueError("Window size cannot be larger than sequence length")
+
+        try:
+            # Process sequence through ESM model
+            batch_labels, batch_strs, batch_tokens = self.alphabet.batch_converter([(0, sequence)])
+            with torch.no_grad():
+                results = self.model(batch_tokens, repr_layers=[33])
+            embeddings = results["representations"][33]
+
+            # Calculate features
+            conservation_scores = embeddings.mean(dim=-1).detach()
+            variability = embeddings.var(dim=1).detach()
+            hydrophobicity_profile = torch.tensor(self._calculate_hydrophobicity_profile(sequence))
+
+            boundaries = []
+            for i in range(1, len(sequence) - window_size):
+                if self._is_domain_boundary(i, conservation_scores, variability, hydrophobicity_profile):
+                    # Calculate boundary score using local features
+                    window_embeddings = embeddings[:, i:i+window_size, :]
+                    mean_emb = torch.mean(window_embeddings, dim=(1, 2))
+
+                    # Calculate score based on local feature changes
+                    conservation_diff = abs(float(conservation_scores[0, i].item()) - float(conservation_scores[0, i-1].item()))
+                    variability_diff = abs(float(variability[0, i].item()) - float(variability[0, i-1].item()))
+                    hydrophobicity_diff = abs(float(hydrophobicity_profile[i]) - float(hydrophobicity_profile[i-1]))
+
+                    # Combine scores
+                    boundary_score = (conservation_diff + variability_diff + hydrophobicity_diff) / 3.0
+
+                    boundaries.append({
+                        "start": i,
+                        "end": i + window_size,
+                        "score": float(boundary_score),
+                        "type": "domain_boundary"
+                    })
+
+            return boundaries
+
+        except Exception as e:
+            logging.error(f"Error in boundary detection: {str(e)}")
+            raise ValueError(f"Error scanning boundaries: {str(e)}")
+
+    def _is_domain_boundary(self, position, conservation_scores, variability, hydrophobicity_profile):
+        """Check if a position is a domain boundary."""
+        try:
+            # Combine multiple features to determine if this is a boundary
+            conservation_change = abs(float(conservation_scores[0, position].item()) - float(conservation_scores[0, position-1].item()))
+            variability_change = abs(float(variability[0, position].item()) - float(variability[0, position-1].item()))
+            hydrophobicity_change = abs(float(hydrophobicity_profile[position]) - float(hydrophobicity_profile[position-1]))
+
+            # Return true if significant changes in multiple features
+            return (conservation_change > 0.5 or variability_change > 0.3 or hydrophobicity_change > 1.0)
+        except Exception as e:
+            logging.error(f"Error in boundary detection: {str(e)}")
+            return False
+
+
 
     def _is_potential_boundary(self, sequence_window):
         """Helper method to identify potential domain boundaries."""
@@ -515,47 +677,76 @@ class DomainAnalyzer:
         return True
 
     def _analyze_binding_features(self, sequence, embeddings, active_sites):
-        """Analyze features related to binding function"""
-        # Check for binding-related patterns
-        binding_confidence = 0.0
+        """Analyze binding features using embeddings."""
+        try:
+            # Use proper dimension reduction with tuples
+            embedding_mean = torch.mean(embeddings, dim=(1, 2))
+            embedding_std = torch.std(embeddings, dim=(1, 2), unbiased=True)
 
-        # Check for binding site patterns
-        if any(site['type'] == 'zinc_binding' for site in active_sites):
-            binding_confidence += 0.4
+            # Calculate binding site features
+            binding_features = []
+            for site in active_sites:
+                site_start, site_end = site["start"], site["end"]
+                site_embeddings = embeddings[:, site_start:site_end, :]
 
-        # Analyze embedding patterns characteristic of binding domains
-        embedding_mean = torch.mean(embeddings, dim=0)
-        if torch.norm(embedding_mean) > 0.5:  # Strong structural signal
-            binding_confidence += 0.3
+                # Calculate site-specific features using proper dimension reduction
+                site_mean = torch.mean(site_embeddings, dim=(1, 2))
+                site_std = torch.std(site_embeddings, dim=(1, 2), unbiased=True)
 
-        # Check hydrophobicity patterns typical of binding sites
-        hydrophobic_regions = sum(1 for aa in sequence if self.hydrophobicity_scale.get(aa, 0) > 2.0)
-        if hydrophobic_regions / len(sequence) > 0.3:  # Significant hydrophobic regions
-            binding_confidence += 0.3
+                # Calculate similarity scores
+                similarity = torch.nn.functional.cosine_similarity(
+                    site_mean.unsqueeze(0),
+                    embedding_mean.unsqueeze(0),
+                    dim=1
+                ).mean().item()
 
-        return min(binding_confidence, 0.95)
+                binding_features.append({
+                    "start": site_start,
+                    "end": site_end,
+                    "similarity": similarity,
+                    "variance": site_std.mean().item()
+                })
 
-    def _analyze_catalytic_features(self, sequence, embeddings, active_sites):
-        """Analyze features related to catalytic function"""
-        # Check for catalytic-related patterns
-        catalytic_confidence = 0.0
+            return binding_features
+        except Exception as e:
+            return []
 
-        # Check for catalytic site patterns
-        if any(site['type'] == 'catalytic_triad' for site in active_sites):
-            catalytic_confidence += 0.4
+    def _analyze_catalytic_features(self, sequence, embeddings):
+        """Analyze catalytic features using embeddings."""
+        try:
+            # Use proper dimension reduction with lists
+            embedding_mean = torch.mean(embeddings, dim=[1, 2])
+            embedding_std = torch.std(embeddings, dim=[1, 2], unbiased=True)
 
-        # Analyze embedding patterns characteristic of catalytic domains
-        embedding_variance = torch.var(embeddings, dim=0).mean().item()
-        if embedding_variance > 0.3:  # Complex structural patterns
-            catalytic_confidence += 0.3
+            # Analyze sequence windows for catalytic patterns
+            window_size = 5
+            catalytic_features = []
 
-        # Check for conserved catalytic residues
-        catalytic_residues = {'H', 'D', 'S', 'E', 'K', 'C'}
-        conserved_catalytic = sum(1 for aa in sequence if aa in catalytic_residues)
-        if conserved_catalytic / len(sequence) > 0.15:  # Significant catalytic residues
-            catalytic_confidence += 0.3
+            for i in range(len(sequence) - window_size + 1):
+                window_embeddings = embeddings[:, i:i+window_size, :]
 
-        return min(catalytic_confidence, 0.95)
+                # Calculate window features using proper dimension reduction
+                window_mean = torch.mean(window_embeddings, dim=[1, 2])
+                window_std = torch.std(window_embeddings, dim=[1, 2], unbiased=True)
+
+                # Calculate pattern similarity
+                similarity = torch.nn.functional.cosine_similarity(
+                    window_mean.unsqueeze(0),
+                    embedding_mean.unsqueeze(0),
+                    dim=1
+                ).mean().item()
+
+                if similarity > 0.8 and window_std.mean().item() > 0.1:
+                    catalytic_features.append({
+                        "start": i,
+                        "end": i + window_size,
+                        "similarity": similarity,
+                        "variance": window_std.mean().item()
+                    })
+
+            return catalytic_features
+        except Exception as e:
+            return []
 
     def _calculate_conservation_scores(self, sequence):
         """Calculate simplified conservation scores"""
@@ -575,10 +766,10 @@ class DomainAnalyzer:
 
             # Normalize scores to [0,1]
             normalized_scores = (conservation_scores - conservation_scores.min()) / (conservation_scores.max() - conservation_scores.min())
-            return normalized_scores.cpu().numpy()
+            return normalized_scores  # Return as torch tensor instead of numpy array
         except Exception as e:
             logger.error(f"Error calculating conservation scores: {e}")
-            return np.ones(len(sequence))  # Fallback to placeholder if error occurs
+            return torch.ones(len(sequence))  # Return torch tensor instead of numpy array
 
     def _generate_heatmap_data(self, sequence, hydrophobicity, domains, active_sites, conservation):
         """Generate heatmap data for visualization"""

@@ -20,9 +20,9 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-import simtk.openmm as mm
-import simtk.openmm.app as app
-import simtk.unit as unit
+import openmm
+import openmm.app as app
+import openmm.unit as unit
 import numpy as np
 import logging
 
@@ -57,7 +57,7 @@ class OpenMMSimulator:
             )
 
             # Add harmonic restraints
-            force = mm.CustomExternalForce("k*((x-x0)^2+(y-y0)^2+(z-z0)^2)")
+            force = openmm.CustomExternalForce("k*((x-x0)^2+(y-y0)^2+(z-z0)^2)")
             force.addGlobalParameter("k", 5.0*unit.kilocalories_per_mole/unit.angstroms**2)
             force.addPerParticleParameter("x0")
             force.addPerParticleParameter("y0")
@@ -99,13 +99,13 @@ class OpenMMSimulator:
                     'error': 'System not initialized'
                 }
 
-            integrator = mm.LangevinIntegrator(
+            integrator = openmm.LangevinIntegrator(
                 300*unit.kelvin,
                 1/unit.picosecond,
                 0.002*unit.picoseconds
             )
 
-            platform = mm.Platform.getPlatformByName('CPU')
+            platform = openmm.Platform.getPlatformByName('CPU')
             simulation = app.Simulation(self.pdb.topology, self.system, integrator, platform)
             simulation.context.setPositions(self.pdb.positions)
 

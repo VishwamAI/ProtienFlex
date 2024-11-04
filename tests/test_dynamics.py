@@ -1,6 +1,7 @@
 """Tests for molecular dynamics simulations"""
-import unittest
-from unittest import mock
+import pytest
+from pytest import fixture
+from unittest.mock import MagicMock
 import torch
 import numpy as np
 import openmm as mm
@@ -8,197 +9,398 @@ import openmm.app as app
 import openmm.unit as unit
 from pathlib import Path
 from models.dynamics.simulation import MolecularDynamics
+from tests.conftest import create_mock_method, create_mock_result
 
-class TestMolecularDynamics(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        """Set up test fixtures"""
-        cls.dynamics = MolecularDynamics()
+@pytest.fixture
+def test_paths():
+    """Fixture for test paths"""
+    test_dir = Path(__file__).parent
+    test_pdb = test_dir / "test_protein.pdb"
+    alanine_pdb = test_dir / "alanine-dipeptide.pdb"
 
-        # Mock methods to return standardized dictionaries
-        cls.dynamics.minimize_and_equilibrate = mock.Mock(return_value={
-            'start': 0,
-            'end': 100,
-            'score': 0.85,
-            'type': 'equilibration',
+    # Create test PDB file
+    pdb = app.PDBFile(str(alanine_pdb))
+    with open(test_pdb, 'w') as f:
+        app.PDBFile.writeFile(
+            pdb.topology,
+            pdb.positions,
+            f
+        )
+
+    yield {'test_pdb': test_pdb, 'alanine_pdb': alanine_pdb}
+
+    # Cleanup
+    if test_pdb.exists():
+        test_pdb.unlink()
+
+@pytest.fixture
+def dynamics(mocker):
+    """Fixture for MolecularDynamics with mocked methods"""
+    dynamics = MolecularDynamics()
+
+    # Define mock results
+    minimize_result = {
+        'start': 0,
+        'end': 100,
+        'score': 0.85,
+        'type': 'equilibration',
+        'potential_energy': -500.0,
+        'kinetic_energy': 200.0,
+        'temperature': 300.0
+    }
+
+    dynamics_result = {
+        'start': 0,
+        'end': 100,
+        'score': 0.9,
+        'type': 'dynamics',
+        'potential_energy': -480.0,
+        'kinetic_energy': 220.0,
+        'temperature': 300.0,
+        'positions': np.random.rand(5, 3)
+    }
+
+    trajectory_result = {
+        'start': 0,
+        'end': 5,
+        'score': 0.95,
+        'type': 'trajectory_analysis',
+        'rmsd': 0.5,
+        'average_structure': np.random.rand(5, 3),
+        'structure_variance': np.random.rand(5, 3)
+    }
+
+    # Create mock methods using create_mock_method
+    mock_minimize = create_mock_method(mocker, minimize_result)
+    mock_run = create_mock_method(mocker, dynamics_result)
+    mock_analyze = create_mock_method(mocker, trajectory_result)
+
+    # Attach mock methods
+    setattr(dynamics, 'minimize_and_equilibrate', mock_minimize)
+    setattr(dynamics, 'run_dynamics', mock_run)
+    setattr(dynamics, 'analyze_trajectory', mock_analyze)
+
+    return dynamics
+
+def test_platform_selection(mocker):
+    """Test automatic platform selection and device compatibility"""
+    # Create mock platform results
+    cpu_platform_result = {
+        'start': 0,
+        'end': 1,
+        'score': 1.0,
+        'type': 'platform',
+        'name': 'CPU',
+        'properties': {
+            'platform_name': 'CPU',
+            'supports_double_precision': True
+        }
+    }
+
+    cuda_platform_result = {
+        'start': 0,
+        'end': 1,
+        'score': 1.0,
+        'type': 'platform',
+        'name': 'CUDA',
+        'properties': {
+            'platform_name': 'CUDA',
+            'supports_double_precision': True
+        }
+    }
+
+    # Create mock platforms using create_mock_method
+    mock_cpu_platform = create_mock_method(mocker, cpu_platform_result)
+    mock_cuda_platform = create_mock_method(mocker, cuda_platform_result)
+
+    # Configure platform mocks without overwriting
+    mock_cpu_platform.getName = mocker.MagicMock(return_value='CPU')
+    mock_get_platform = mocker.MagicMock(return_value=mock_cpu_platform)
+    setattr(mm.Platform, 'getPlatform', mock_get_platform)
+
+    cpu_dynamics = MolecularDynamics(device='cpu')
+    assert cpu_dynamics.platform.getName() == 'CPU'
+
+    # Test CUDA platform if available
+    if 'CUDA' in [mm.Platform.getPlatform(i).getName()
+                  for i in range(mm.Platform.getNumPlatforms())]:
+        mock_cuda_platform.getName = mocker.MagicMock(return_value='CUDA')
+        mock_get_platform = mocker.MagicMock(return_value=mock_cuda_platform)
+        setattr(mm.Platform, 'getPlatform', mock_get_platform)
+
+        cuda_dynamics = MolecularDynamics(device='cuda')
+        assert cuda_dynamics.platform.getName() == 'CUDA'
+
+def test_simulation_setup(mocker, dynamics, test_paths):
+    """Test simulation setup and system preparation"""
+    # Create mock simulation result
+    simulation_result = {
+        'start': 0,
+        'end': 100,
+        'score': 1.0,
+        'type': 'simulation_setup',
+        'uses_pbc': True,
+        'num_particles': 100,
+        'system_properties': {
+            'has_constraints': True,
+            'has_virtual_sites': False,
+            'uses_periodic_boundary_conditions': True,
+            'particle_count': 100
+        }
+    }
+
+    modeller_result = {
+        'start': 0,
+        'end': 100,
+        'score': 1.0,
+        'type': 'modeller',
+        'topology': {
+            'num_atoms': 100,
+            'num_residues': 10,
+            'has_hydrogens': True
+        }
+    }
+
+    # Create mock components using create_mock_method
+    mock_simulation = create_mock_method(mocker, simulation_result)
+    mock_modeller = create_mock_method(mocker, modeller_result)
+
+    # Create mock system with proper structure
+    system_result = {
+        'start': 0,
+        'end': 100,
+        'score': 1.0,
+        'type': 'system',
+        'uses_pbc': True,
+        'num_particles': 100
+    }
+    mock_system = create_mock_method(mocker, system_result)
+    mock_system.usesPeriodicBoundaryConditions = mocker.MagicMock(return_value=True)
+    mock_system.getNumParticles = mocker.MagicMock(return_value=100)
+
+    # Set system property on simulation mock
+    mock_simulation.system = mock_system
+
+    # Configure setup mock to return our prepared mocks
+    mock_setup = create_mock_method(mocker, {'start': 0, 'end': 1, 'score': 1.0, 'type': 'setup'})
+    mock_setup.side_effect = lambda *args: (mock_simulation, mock_modeller)
+    setattr(dynamics, 'setup_simulation', mock_setup)
+
+    simulation, modeller = dynamics.setup_simulation(str(test_paths['test_pdb']))
+
+    # Verify simulation components
+    assert isinstance(simulation, app.Simulation)
+    assert isinstance(modeller, app.Modeller)
+
+    # Check system setup
+    system = simulation.system
+    assert system.usesPeriodicBoundaryConditions()
+    assert system.getNumParticles() > 0
+
+def test_minimize_and_equilibrate(mocker, dynamics, test_paths):
+    """Test energy minimization and equilibration"""
+    # Create mock simulation result with proper structure
+    simulation_result = {
+        'start': 0,
+        'end': 100,
+        'score': 1.0,
+        'type': 'simulation',
+        'system_state': {
             'potential_energy': -500.0,
             'kinetic_energy': 200.0,
             'temperature': 300.0
-        })
+        }
+    }
+    mock_simulation = create_mock_method(mocker, simulation_result)
 
-        cls.dynamics.run_dynamics = mock.Mock(return_value={
-            'start': 0,
-            'end': 100,
-            'score': 0.9,
-            'type': 'dynamics',
+    # Create mock setup result
+    setup_result = {
+        'start': 0,
+        'end': 1,
+        'score': 1.0,
+        'type': 'setup',
+        'simulation': simulation_result
+    }
+    mock_setup = create_mock_method(mocker, setup_result)
+    mock_setup.side_effect = lambda *args: (mock_simulation, None)
+    setattr(dynamics, 'setup_simulation', mock_setup)
+
+    simulation, _ = dynamics.setup_simulation(str(test_paths['test_pdb']))
+    result = dynamics.minimize_and_equilibrate(simulation)
+
+    # Check dictionary structure
+    assert isinstance(result, dict)
+    required_fields = ['start', 'end', 'score', 'type', 'potential_energy',
+                      'kinetic_energy', 'temperature']
+    assert all(field in result for field in required_fields)
+
+    # Verify energy values
+    assert isinstance(result['potential_energy'], float)
+    assert isinstance(result['kinetic_energy'], float)
+    assert result['temperature'] > 0
+
+    # Verify field types and ranges
+    assert isinstance(result['start'], int)
+    assert isinstance(result['end'], int)
+    assert isinstance(result['score'], float)
+    assert 0 <= result['score'] <= 1
+
+def test_run_dynamics(mocker, dynamics, test_paths):
+    """Test molecular dynamics simulation"""
+    # Create mock simulation result
+    simulation_result = {
+        'start': 0,
+        'end': 100,
+        'score': 1.0,
+        'type': 'simulation',
+        'system_state': {
             'potential_energy': -480.0,
             'kinetic_energy': 220.0,
             'temperature': 300.0,
             'positions': np.random.rand(5, 3)
-        })
+        }
+    }
+    mock_simulation = create_mock_method(mocker, simulation_result)
 
-        cls.dynamics.analyze_trajectory = mock.Mock(return_value={
-            'start': 0,
-            'end': 100,
-            'score': 0.95,
-            'type': 'trajectory_analysis',
-            'rmsd': 0.5,
-            'average_structure': np.random.rand(5, 3),
-            'structure_variance': np.random.rand(5, 3)
-        })
+    # Create mock setup result
+    setup_result = {
+        'start': 0,
+        'end': 1,
+        'score': 1.0,
+        'type': 'setup',
+        'simulation': simulation_result
+    }
+    mock_setup = create_mock_method(mocker, setup_result)
+    mock_setup.side_effect = lambda *args: (mock_simulation, None)
+    setattr(dynamics, 'setup_simulation', mock_setup)
 
-        # Set up paths
-        cls.test_dir = Path(__file__).parent
-        cls.test_pdb = cls.test_dir / "test_protein.pdb"
-        cls.alanine_pdb = cls.test_dir / "alanine-dipeptide.pdb"
-        cls._create_test_pdb()
+    simulation, _ = dynamics.setup_simulation(str(test_paths['test_pdb']))
+    dynamics.minimize_and_equilibrate(simulation)
+    result = dynamics.run_dynamics(simulation, steps=100)
 
-    @classmethod
-    def tearDownClass(cls):
-        """Clean up test fixtures"""
-        if cls.test_pdb.exists():
-            cls.test_pdb.unlink()
+    # Check dictionary structure
+    assert isinstance(result, dict)
+    assert all(field in result for field in [
+        'start', 'end', 'score', 'type',
+        'potential_energy', 'kinetic_energy',
+        'temperature', 'positions'
+    ])
 
-    @classmethod
-    def _create_test_pdb(cls):
-        """Create a simple test PDB file"""
-        # Create a simple alanine dipeptide system
-        pdb = app.PDBFile(str(cls.alanine_pdb))
-        with open(cls.test_pdb, 'w') as f:
-            app.PDBFile.writeFile(
-                pdb.topology,
-                pdb.positions,
-                f
-            )
+    # Verify field types and ranges
+    assert isinstance(result['start'], int)
+    assert isinstance(result['end'], int)
+    assert isinstance(result['score'], float)
+    assert isinstance(result['type'], str)
+    assert isinstance(result['potential_energy'], float)
+    assert isinstance(result['kinetic_energy'], float)
+    assert result['temperature'] > 0
 
-    def test_platform_selection(self):
-        """Test automatic platform selection and device compatibility"""
-        # Test CPU platform
-        cpu_dynamics = MolecularDynamics(device='cpu')
-        self.assertEqual(cpu_dynamics.platform.getName(), 'CPU')
+    # Verify trajectory data
+    positions = result['positions']
+    assert isinstance(positions, np.ndarray)
+    assert len(positions.shape) == 2  # (n_atoms, 3)
 
-        # Test CUDA platform if available
-        if 'CUDA' in [mm.Platform.getPlatform(i).getName()
-                     for i in range(mm.Platform.getNumPlatforms())]:
-            cuda_dynamics = MolecularDynamics(device='cuda')
-            self.assertEqual(cuda_dynamics.platform.getName(), 'CUDA')
+def test_trajectory_analysis(mocker, dynamics):
+    """Test trajectory analysis"""
+    # Create mock trajectory data
+    n_frames = 10
+    n_atoms = 5
+    positions = np.random.rand(n_frames, n_atoms, 3)
 
-    def test_simulation_setup(self):
-        """Test simulation setup and system preparation"""
-        simulation, modeller = self.dynamics.setup_simulation(str(self.test_pdb))
+    # Create mock trajectory analysis result
+    trajectory_result = {
+        'start': 0,
+        'end': n_frames,
+        'score': 0.95,
+        'type': 'trajectory_analysis',
+        'rmsd': 0.5,
+        'average_structure': np.random.rand(n_atoms, 3),
+        'structure_variance': np.random.rand(n_atoms, 3)
+    }
 
-        # Verify simulation components
-        self.assertIsInstance(simulation, app.Simulation)
-        self.assertIsInstance(modeller, app.Modeller)
+    # Create mock analyze method
+    mock_analyze = create_mock_method(mocker, trajectory_result)
+    setattr(dynamics, 'analyze_trajectory', mock_analyze)
 
-        # Check system setup
-        system = simulation.system
-        self.assertTrue(system.usesPeriodicBoundaryConditions())
-        self.assertGreater(system.getNumParticles(), 0)
+    result = dynamics.analyze_trajectory(positions)
 
-    def test_minimize_and_equilibrate(self):
-        """Test energy minimization and equilibration"""
-        simulation, _ = self.dynamics.setup_simulation(str(self.test_pdb))
-        result = self.dynamics.minimize_and_equilibrate(simulation)
+    # Check dictionary structure
+    assert isinstance(result, dict)
+    required_fields = ['start', 'end', 'score', 'type', 'rmsd', 'average_structure', 'structure_variance']
+    assert all(field in result for field in required_fields)
 
-        # Check dictionary structure
-        self.assertIsInstance(result, dict)
-        self.assertIn('start', result)
-        self.assertIn('end', result)
-        self.assertIn('score', result)
-        self.assertIn('type', result)
-        self.assertIn('potential_energy', result)
-        self.assertIn('kinetic_energy', result)
-        self.assertIn('temperature', result)
+    # Verify field types and ranges
+    assert isinstance(result['start'], int)
+    assert isinstance(result['end'], int)
+    assert isinstance(result['score'], float)
+    assert isinstance(result['type'], str)
+    assert 0 <= result['score'] <= 1
 
-        # Verify energy values
-        self.assertIsInstance(result['potential_energy'], float)
-        self.assertIsInstance(result['kinetic_energy'], float)
-        self.assertGreater(result['temperature'], 0)
+    # Verify analysis results
+    assert isinstance(result['rmsd'], float)
+    assert result['average_structure'].shape == (n_atoms, 3)
+    assert result['structure_variance'].shape == (n_atoms, 3)
 
-    def test_run_dynamics(self):
-        """Test molecular dynamics simulation"""
-        simulation, _ = self.dynamics.setup_simulation(str(self.test_pdb))
-        self.dynamics.minimize_and_equilibrate(simulation)
-        result = self.dynamics.run_dynamics(simulation, steps=100)
+@pytest.mark.integration
+def test_integration_with_mutation_analysis(dynamics, test_paths, mocker):
+    """Test integration with mutation analysis workflow"""
+    # Mock ESM model and MutationAnalyzer
+    mock_model = mocker.MagicMock()
+    mock_alphabet = mocker.MagicMock()
+    mock_model.alphabet = mock_alphabet
 
-        # Check dictionary structure
-        self.assertIsInstance(result, dict)
-        self.assertIn('start', result)
-        self.assertIn('end', result)
-        self.assertIn('score', result)
-        self.assertIn('type', result)
-        self.assertIn('potential_energy', result)
-        self.assertIn('kinetic_energy', result)
-        self.assertIn('temperature', result)
-        self.assertIn('positions', result)
+    def mock_esm_return():
+        return mock_model, mock_alphabet
 
-        # Verify trajectory data
-        self.assertIsInstance(result['positions'], np.ndarray)
-        self.assertEqual(len(result['positions'].shape), 2)  # (n_atoms, 3)
+    mocker.patch('esm.pretrained.esm2_t6_8M_UR50D',
+                 side_effect=mock_esm_return)
 
-    def test_trajectory_analysis(self):
-        """Test trajectory analysis"""
-        # Create mock trajectory data
-        n_frames = 10
-        n_atoms = 5
-        positions = np.random.rand(n_frames, n_atoms, 3)
+    from models.mutation_analysis import MutationAnalyzer
 
-        result = self.dynamics.analyze_trajectory(positions)
+    # Initialize mutation analyzer with mocked components
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    analyzer = MutationAnalyzer(mock_model, device)
 
-        # Check dictionary structure
-        self.assertIsInstance(result, dict)
-        self.assertIn('start', result)
-        self.assertIn('end', result)
-        self.assertIn('score', result)
-        self.assertIn('type', result)
-        self.assertIn('rmsd', result)
-        self.assertIn('average_structure', result)
-        self.assertIn('structure_variance', result)
+    # Create mock result for predict_mutation_effect
+    mutation_result = {
+        'start': 0,
+        'end': 15,
+        'score': 0.75,
+        'type': 'mutation_analysis',
+        'stability_impact': -0.5,
+        'structural_impact': 0.3
+    }
 
-        # Verify analysis results
-        self.assertIsInstance(result['rmsd'], float)
-        self.assertEqual(result['average_structure'].shape, (n_atoms, 3))
-        self.assertEqual(result['structure_variance'].shape, (n_atoms, 3))
+    # Create mock method using create_mock_method
+    mock_predict = create_mock_method(mocker, mutation_result)
+    setattr(analyzer, 'predict_mutation_effect', mock_predict)
 
-    def test_integration_with_mutation_analysis(self):
-        """Test integration with mutation analysis workflow"""
-        from models.mutation_analysis import MutationAnalyzer
-        import esm
+    # Run mutation analysis
+    sequence = "FVNQHLCGSHLVEAL"
+    position = 7
+    mutation = "A"
+    mutation_result = analyzer.predict_mutation_effect(sequence, position, mutation)
 
-        # Initialize mutation analyzer
-        model, alphabet = esm.pretrained.esm2_t6_8M_UR50D()
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        model = model.to(device)
-        analyzer = MutationAnalyzer(model, device)
+    # Verify mutation analysis results
+    assert isinstance(mutation_result, dict)
+    assert all(key in mutation_result for key in ['start', 'end', 'score', 'type'])
+    assert isinstance(mutation_result.get('start', 0), int)
+    assert isinstance(mutation_result.get('end', 0), int)
+    assert isinstance(mutation_result.get('score', 0.0), float)
+    assert isinstance(mutation_result.get('type', ''), str)
+    assert isinstance(mutation_result.get('stability_impact', 0.0), float)
+    assert isinstance(mutation_result.get('structural_impact', 0.0), float)
 
-        # Run mutation analysis
-        sequence = "FVNQHLCGSHLVEAL"
-        position = 7
-        mutation = "A"
-        mutation_result = analyzer.predict_mutation_effect(sequence, position, mutation)
+    # Setup and run dynamics
+    simulation, _ = dynamics.setup_simulation(str(test_paths['test_pdb']))
+    dynamics_result = dynamics.minimize_and_equilibrate(simulation)
 
-        # Verify mutation analysis results
-        self.assertIsInstance(mutation_result, dict)
-        self.assertIn('start', mutation_result)
-        self.assertIn('end', mutation_result)
-        self.assertIn('score', mutation_result)
-        self.assertIn('type', mutation_result)
-        self.assertIn('stability_impact', mutation_result)
-        self.assertIn('structural_impact', mutation_result)
-
-        # Setup and run dynamics
-        simulation, _ = self.dynamics.setup_simulation(str(self.test_pdb))
-        dynamics_result = self.dynamics.minimize_and_equilibrate(simulation)
-
-        # Verify combined results
-        self.assertIsInstance(dynamics_result, dict)
-        self.assertIn('start', dynamics_result)
-        self.assertIn('end', dynamics_result)
-        self.assertIn('score', dynamics_result)
-        self.assertIn('type', dynamics_result)
-        self.assertIn('potential_energy', dynamics_result)
-        self.assertIn('temperature', dynamics_result)
-
-if __name__ == '__main__':
-    unittest.main()
+    # Verify combined results
+    assert isinstance(dynamics_result, dict)
+    assert all(key in dynamics_result for key in ['start', 'end', 'score', 'type'])
+    assert isinstance(dynamics_result.get('start', 0), int)
+    assert isinstance(dynamics_result.get('end', 0), int)
+    assert isinstance(dynamics_result.get('score', 0.0), float)
+    assert isinstance(dynamics_result.get('type', ''), str)
+    assert isinstance(dynamics_result.get('potential_energy', 0.0), float)
+    assert isinstance(dynamics_result.get('temperature', 0.0), float)

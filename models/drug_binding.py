@@ -24,9 +24,9 @@
 import torch
 import numpy as np
 from typing import List, Dict, Tuple, Optional
-import simtk.openmm as openmm
-import simtk.openmm.app as app
-import simtk.unit as unit
+import openmm
+import openmm.app as app
+import openmm.unit as unit
 import mdtraj as md
 
 class DrugBindingAnalyzer:

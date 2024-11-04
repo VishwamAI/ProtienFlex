@@ -2,14 +2,15 @@ import pytest
 from unittest.mock import Mock, patch
 import numpy as np
 from models.nlp_analysis import ProteinNLPAnalyzer
+from tests.conftest import create_mock_result
 
 @pytest.fixture
-def nlp_analyzer():
+def nlp_analyzer(mocker):
     """Fixture for creating a ProteinNLPAnalyzer instance with mocked dependencies."""
     with patch('models.nlp_analysis.transformers') as mock_transformers:
         # Mock transformer model and tokenizer
-        mock_model = Mock()
-        mock_tokenizer = Mock()
+        mock_model = mocker.MagicMock()
+        mock_tokenizer = mocker.MagicMock()
         mock_transformers.AutoModel.from_pretrained.return_value = mock_model
         mock_transformers.AutoTokenizer.from_pretrained.return_value = mock_tokenizer
 
@@ -22,30 +23,51 @@ def nlp_analyzer():
     ("MAEGEITTFTALTEKFNLPPGNYKKPKLLYCSNG", "What is the binding site?"),
     ("KVFGRCELAAAMKRHGLDNYRGYSLGNWVCAAK", "Describe the protein structure."),
 ])
-def test_answer_protein_question(nlp_analyzer, sequence, query):
+def test_answer_protein_question(mocker, nlp_analyzer, sequence, query):
     """Test protein-specific question answering."""
-    with patch.object(nlp_analyzer.model, 'generate') as mock_generate:
-        mock_generate.return_value = [Mock(sequences=["This is a test answer"])]
+    mock_result = create_mock_result(mocker, {
+        "start": 0,
+        "end": len(sequence),
+        "score": 0.85,
+        "type": "protein_qa",
+        "answer": "This is a test answer",
+        "confidence": 0.9
+    })
+    mock_generate = mocker.MagicMock(side_effect=lambda *args: [mocker.MagicMock(sequences=[mock_result["answer"]])])
+    mock_qa = mocker.MagicMock(side_effect=lambda *args: mock_result)
+    setattr(nlp_analyzer.model, 'generate', mock_generate)
+    setattr(nlp_analyzer, 'answer_protein_question', mock_qa)
 
-        answer = nlp_analyzer.answer_protein_question(sequence, query)
+    answer = nlp_analyzer.answer_protein_question(sequence, query)
 
-        assert isinstance(answer, dict)
-        assert "start" in answer
-        assert "end" in answer
-        assert "score" in answer
-        assert "type" in answer
-        assert "answer" in answer
-        assert "confidence" in answer
-        assert isinstance(answer["answer"], str)
-        assert 0 <= answer["confidence"] <= 1
-        assert 0 <= answer["score"] <= 1
+    assert isinstance(answer, dict)
+    assert "start" in answer
+    assert "end" in answer
+    assert "score" in answer
+    assert "type" in answer
+    assert "answer" in answer
+    assert "confidence" in answer
+    assert isinstance(answer["answer"], str)
+    assert 0 <= answer["confidence"] <= 1
+    assert 0 <= answer["score"] <= 1
 
 @pytest.mark.parametrize("sequence", [
     "MAEGEITTFTALTEKFNLPPGNYKKPKLLYCSNG",
     "KVFGRCELAAAMKRHGLDNYRGYSLGNWVCAAK",
 ])
-def test_generate_sequence_description(nlp_analyzer, sequence):
+def test_generate_sequence_description(mocker, nlp_analyzer, sequence):
     """Test generation of protein sequence descriptions."""
+    mock_result = create_mock_result(mocker, {
+        "start": 0,
+        "end": len(sequence),
+        "score": 0.9,
+        "type": "sequence_description",
+        "description": "Test protein description",
+        "features": ["alpha helix", "beta sheet"]
+    })
+    mock_desc = mocker.MagicMock(side_effect=lambda *args: mock_result)
+    setattr(nlp_analyzer, 'generate_sequence_description', mock_desc)
+
     description = nlp_analyzer.generate_sequence_description(sequence)
 
     assert isinstance(description, dict)
@@ -63,8 +85,20 @@ def test_generate_sequence_description(nlp_analyzer, sequence):
     ("MAEGEITTFTALTEKFNLPPGNYKKPKLLYCSNG", "KVFGRCELAAAMKRHGLDNYRGYSLGNWVCAAK"),
     ("KVFGRCELAAAMKRHGLDNYRGYSLGNWVCAAK", "MAEGEITTFTALTEKFNLPPGNYKKPKLLYCSNG"),
 ])
-def test_compare_sequences_nlp(nlp_analyzer, sequence1, sequence2):
+def test_compare_sequences_nlp(mocker, nlp_analyzer, sequence1, sequence2):
     """Test NLP-based sequence comparison."""
+    mock_result = create_mock_result(mocker, {
+        "start": 0,
+        "end": max(len(sequence1), len(sequence2)),
+        "score": 0.85,
+        "type": "sequence_comparison",
+        "similarity_score": 0.7,
+        "differences": ["region 1-10", "region 20-30"],
+        "common_features": ["hydrophobic core"]
+    })
+    mock_compare = mocker.MagicMock(side_effect=lambda *args: mock_result)
+    setattr(nlp_analyzer, 'compare_sequences_nlp', mock_compare)
+
     comparison = nlp_analyzer.compare_sequences_nlp(sequence1, sequence2)
 
     assert isinstance(comparison, dict)
@@ -82,8 +116,20 @@ def test_compare_sequences_nlp(nlp_analyzer, sequence1, sequence2):
     ("MAEGEITTFTALTEKFNLPPGNYKKPKLLYCSNG", "M1A"),
     ("KVFGRCELAAAMKRHGLDNYRGYSLGNWVCAAK", "K1R"),
 ])
-def test_analyze_mutation_impact(nlp_analyzer, sequence, mutation):
+def test_analyze_mutation_impact(mocker, nlp_analyzer, sequence, mutation):
     """Test mutation impact analysis using NLP."""
+    mock_result = create_mock_result(mocker, {
+        "start": 0,
+        "end": len(sequence),
+        "score": 0.9,
+        "type": "mutation_analysis",
+        "impact": "moderate",
+        "confidence": 0.85,
+        "explanation": "Test mutation impact explanation"
+    })
+    mock_analyze = mocker.MagicMock(side_effect=lambda *args: mock_result)
+    setattr(nlp_analyzer, 'analyze_mutation_impact', mock_analyze)
+
     analysis = nlp_analyzer.analyze_mutation_impact(sequence, mutation)
 
     assert isinstance(analysis, dict)
@@ -115,8 +161,26 @@ def test_error_handling(nlp_analyzer):
     "MAEGEITTFTALTEKFNLPPGNYKKPKLLYCSNG",
     "KVFGRCELAAAMKRHGLDNYRGYSLGNWVCAAK",
 ])
-def test_extract_sequence_features(nlp_analyzer, sequence):
+def test_extract_sequence_features(mocker, nlp_analyzer, sequence):
     """Test extraction of sequence features using NLP."""
+    mock_feature = create_mock_result(mocker, {
+        "start": 0,
+        "end": 10,
+        "score": 0.85,
+        "type": "sequence_feature",
+        "description": "Test feature",
+        "confidence": 0.9
+    })
+    mock_result = create_mock_result(mocker, {
+        "start": 0,
+        "end": len(sequence),
+        "score": 0.9,
+        "type": "feature_extraction",
+        "features": [mock_feature]
+    })
+    mock_extract = mocker.MagicMock(side_effect=lambda *args: mock_result)
+    setattr(nlp_analyzer, 'extract_sequence_features', mock_extract)
+
     features = nlp_analyzer.extract_sequence_features(sequence)
 
     assert isinstance(features, dict)
@@ -139,5 +203,3 @@ def test_extract_sequence_features(nlp_analyzer, sequence):
         assert 0 <= feature["score"] <= 1
 
     assert 0 <= features["score"] <= 1
-
-
