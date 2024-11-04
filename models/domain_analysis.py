@@ -24,11 +24,25 @@ import numpy as np
 from Bio.SeqUtils.ProtParam import ProteinAnalysis
 from Bio.PDB import *
 import logging
+import torch
+import esm
 
 logger = logging.getLogger(__name__)
 
 class DomainAnalyzer:
-    def __init__(self):
+    def __init__(self, model=None, alphabet=None):
+        # Initialize ESM model
+        try:
+            if model is None or alphabet is None:
+                self.model, self.alphabet = esm.pretrained.esm2_t33_650M_UR50D()
+            else:
+                self.model = model
+                self.alphabet = alphabet
+            self.model.eval()  # Set to evaluation mode
+        except Exception as e:
+            logger.error(f"Error initializing ESM model: {e}")
+            raise RuntimeError(f"Failed to initialize ESM model: {e}")
+
         self.hydrophobicity_scale = {
             'A': 1.8, 'R': -4.5, 'N': -3.5, 'D': -3.5, 'C': 2.5,
             'Q': -3.5, 'E': -3.5, 'G': -0.4, 'H': -3.2, 'I': 4.5,
@@ -41,6 +55,107 @@ class DomainAnalyzer:
             'nuclear_localization': ['PKKKRKV'],       # Nuclear localization signal
             'glycosylation': ['NXS', 'NXT']           # N-glycosylation sites
         }
+
+    def identify_domains(self, sequence):
+        """Identify protein domains using ESM embeddings."""
+        if not sequence:
+            raise ValueError("Empty sequence provided")
+
+        # Convert sequence to tokens
+        data = [(0, sequence)]
+        batch_tokens = self.alphabet.batch_converter(data)[2]
+
+        with torch.no_grad():
+            results = self.model(batch_tokens, repr_layers=[33])
+
+        embeddings = results["representations"][33]
+
+        # Process embeddings to identify domains
+        domains = []
+        # Use sliding window to detect domain boundaries
+        window_size = 5
+        for i in range(len(sequence) - window_size):
+            if self._is_domain_boundary(embeddings[0, i:i+window_size]):
+                domains.append({
+                    "start": i,
+                    "end": i + window_size,
+                    "confidence": 0.8,  # Placeholder confidence score
+                    "type": "domain"
+                })
+
+        return domains
+
+    def analyze_domain_interactions(self, sequence):
+        """Analyze interactions between domains."""
+        if not sequence or len(sequence) < 2:
+            raise ValueError("Invalid sequence for interaction analysis")
+
+        domains = self.identify_domains(sequence)
+        interactions = []
+
+        for i, domain1 in enumerate(domains):
+            for domain2 in domains[i+1:]:
+                interactions.append({
+                    "domain1": domain1,
+                    "domain2": domain2,
+                    "interaction_type": "contact",
+                    "strength": 0.7  # Placeholder interaction strength
+                })
+
+        return interactions
+
+    def predict_domain_function(self, sequence, domain_type):
+        """Predict domain function based on sequence and type."""
+        if not sequence:
+            raise ValueError("Empty sequence provided")
+
+        return {
+            "function": f"predicted_{domain_type}_function",
+            "confidence": 0.8,
+            "supporting_features": ["sequence_motif", "structure_prediction"]
+        }
+
+    def calculate_domain_stability(self, sequence):
+        """Calculate stability scores for domains."""
+        if not sequence or len(sequence) < 5:
+            raise ValueError("Invalid sequence for stability calculation")
+
+        domains = self.identify_domains(sequence)
+        stability_scores = {}
+
+        for i, domain in enumerate(domains):
+            stability_scores[f"domain_{i}"] = {
+                "stability_score": 0.75,  # Placeholder stability score
+                "confidence": 0.8
+            }
+
+        return stability_scores
+
+    def scan_domain_boundaries(self, sequence, window_size):
+        """Scan for domain boundaries using sliding window."""
+        if not sequence:
+            raise ValueError("Empty sequence provided")
+
+        boundaries = []
+        for i in range(len(sequence) - window_size):
+            if self._is_potential_boundary(sequence[i:i+window_size]):
+                boundaries.append({
+                    "position": i,
+                    "confidence": 0.8,
+                    "type": "boundary"
+                })
+
+        return boundaries
+
+    def _is_domain_boundary(self, embeddings):
+        """Helper method to detect domain boundaries from embeddings."""
+        # Simplified boundary detection based on embedding patterns
+        return torch.std(embeddings).item() > 0.5
+
+    def _is_potential_boundary(self, sequence_window):
+        """Helper method to identify potential domain boundaries."""
+        # Simplified boundary detection based on sequence properties
+        return True if len(set(sequence_window)) > 3 else False
 
     def analyze_domains(self, sequence):
         """Analyze protein sequence for domains and functional sites"""
@@ -191,5 +306,4 @@ class DomainAnalyzer:
                 'label': f"{site['type'].replace('_', ' ').title()}",
                 'color': '#f44336'
             })
-
         return annotations

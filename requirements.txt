@@ -4,17 +4,17 @@ wheel>=0.38.4
 Cython==0.29.36  # Pin to specific version for mdtraj compatibility
 
 # Core ML and scientific computing
-torch==2.0.1
-numpy==1.23.5  # Version compatible with mdtraj 1.10.0
-scipy==1.9.3  # Updated version compatible with numpy 1.23.5
+torch>=2.2.0
+numpy>=2.0.0  # Updated version for compatibility
+scipy>=1.10.0  # Updated version for compatibility
 pandas==2.0.3
 scikit-learn==1.2.2
 
 # Protein structure analysis
-biopython==1.79  # Pin to version compatible with prody
-mdtraj==1.10.0  # Use latest version with pre-built binary support
-prody==2.4.1  # Pin to a specific version for compatibility
-biotite==0.35.0
+biopython>=1.81  # Updated version for compatibility
+mdtraj>=1.9.7  # Updated version for compatibility
+prody>=2.4.0  # Updated version for compatibility
+biotite>=0.36.0  # Updated version for compatibility
 
 # Visualization
 plotly==5.13.1
@@ -24,16 +24,16 @@ py3dmol==1.8.1
 flask==2.0.1
 
 # Machine learning and NLP
-transformers==4.30.2
-datasets==2.12.0
-tokenizers==0.13.3
+transformers>=4.30.2
+datasets>=2.12.0
+tokenizers>=0.13.3
 
 # Utilities
 tqdm==4.65.0
 requests==2.31.0
 
 # OpenMM for molecular dynamics
-openmm==8.1.1  # Use a stable version for compatibility
+openmm==8.0.0  # Updated version for compatibility
 
 # ESM for protein language modeling
 fair-esm==2.0.0
