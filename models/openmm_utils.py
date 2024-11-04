@@ -67,16 +67,37 @@ class OpenMMSimulator:
                 force.addParticle(self.system.getNumParticles()-1, [atom.x, atom.y, atom.z])
 
             self.system.addForce(force)
-            return True
+
+            # Return standardized dictionary
+            return {
+                'start': 0,
+                'end': len(list(self.pdb.topology.residues())),
+                'score': 1.0,  # System setup successful
+                'type': 'system_setup',
+                'system': self.system,
+                'topology': self.pdb.topology
+            }
         except Exception as e:
             logger.error(f"Error setting up OpenMM system: {e}")
-            return False
+            return {
+                'start': 0,
+                'end': 0,
+                'score': 0.0,
+                'type': 'system_setup_error',
+                'error': str(e)
+            }
 
     def minimize_structure(self):
         """Minimize the structure using OpenMM"""
         try:
             if self.system is None or self.pdb is None:
-                return None
+                return {
+                    'start': 0,
+                    'end': 0,
+                    'score': 0.0,
+                    'type': 'minimization_error',
+                    'error': 'System not initialized'
+                }
 
             integrator = mm.LangevinIntegrator(
                 300*unit.kelvin,
@@ -91,19 +112,44 @@ class OpenMMSimulator:
             # Minimize
             simulation.minimizeEnergy(maxIterations=100)
 
-            # Get minimized positions
-            state = simulation.context.getState(getPositions=True)
+            # Get minimized positions and energy
+            state = simulation.context.getState(getPositions=True, getEnergy=True)
             self.positions = state.getPositions()
-            return self.positions
+            energy = state.getPotentialEnergy().value_in_unit(unit.kilocalories_per_mole)
+
+            # Calculate confidence score based on energy
+            max_energy = 1000.0  # Reference maximum energy
+            confidence = max(0.0, min(1.0, 1.0 - (energy / max_energy)))
+
+            return {
+                'start': 0,
+                'end': len(list(self.pdb.topology.residues())),
+                'score': float(confidence),
+                'type': 'structure_minimization',
+                'positions': self.positions,
+                'energy': energy
+            }
         except Exception as e:
             logger.error(f"Error minimizing structure: {e}")
-            return None
+            return {
+                'start': 0,
+                'end': 0,
+                'score': 0.0,
+                'type': 'minimization_error',
+                'error': str(e)
+            }
 
     def calculate_contact_map(self, cutoff=8.0):
         """Calculate contact map from atomic positions"""
         try:
             if self.positions is None or self.pdb is None:
-                return None
+                return {
+                    'start': 0,
+                    'end': 0,
+                    'score': 0.0,
+                    'type': 'contact_map_error',
+                    'error': 'Positions or PDB not initialized'
+                }
 
             positions = self.positions.value_in_unit(unit.angstrom)
             n_residues = len(list(self.pdb.topology.residues()))
@@ -123,10 +169,26 @@ class OpenMMSimulator:
                         if min_dist <= cutoff:
                             contact_map[i,j] = contact_map[j,i] = 1
 
-            return contact_map
+            # Calculate contact density as score
+            contact_density = np.sum(contact_map) / (n_residues * n_residues)
+
+            return {
+                'start': 0,
+                'end': n_residues,
+                'score': float(contact_density),
+                'type': 'contact_map',
+                'contact_map': contact_map,
+                'cutoff': cutoff
+            }
         except Exception as e:
             logger.error(f"Error calculating contact map: {e}")
-            return None
+            return {
+                'start': 0,
+                'end': 0,
+                'score': 0.0,
+                'type': 'contact_map_error',
+                'error': str(e)
+            }
 
     def calculate_structure_confidence(self, contact_map=None):
         """Calculate confidence score based on contact density"""
@@ -134,13 +196,31 @@ class OpenMMSimulator:
             if contact_map is None:
                 contact_map = self.calculate_contact_map()
             if contact_map is None:
-                return 50.0
+                return {
+                    'start': 0,
+                    'end': 0,
+                    'score': 50.0,
+                    'type': 'structure_confidence_error',
+                    'error': 'Invalid contact map'
+                }
 
             sequence_length = len(list(self.pdb.topology.residues()))
             contact_density = np.sum(contact_map) / (sequence_length * sequence_length)
             # Scale to 0-100 range with sigmoid
             confidence = 100 / (1 + np.exp(-10 * (contact_density - 0.2)))
-            return float(confidence)
+            return {
+                'start': 0,
+                'end': sequence_length,
+                'score': float(confidence),
+                'type': 'structure_confidence',
+                'contact_density': float(contact_density)
+            }
         except Exception as e:
             logger.error(f"Error calculating confidence: {e}")
-            return 50.0
+            return {
+                'start': 0,
+                'end': 0,
+                'score': 50.0,
+                'type': 'structure_confidence_error',
+                'error': str(e)
+            }

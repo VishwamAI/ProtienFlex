@@ -84,15 +84,39 @@ class MutationAnalyzer:
             impact_score = (stability_score + structural_score + conservation_score) / 3
 
             return {
-                'stability_impact': stability_score,
-                'structural_impact': structural_score,
-                'conservation_score': conservation_score,
-                'overall_impact': impact_score,
+                'start': position,
+                'end': position + 1,
+                'score': float(impact_score),
+                'type': 'mutation_effect',
+                'stability_impact': {
+                    'start': position,
+                    'end': position + 1,
+                    'score': float(stability_score),
+                    'type': 'stability_analysis'
+                },
+                'structural_impact': {
+                    'start': position,
+                    'end': position + 1,
+                    'score': float(structural_score),
+                    'type': 'structural_analysis'
+                },
+                'conservation_score': {
+                    'start': position,
+                    'end': position + 1,
+                    'score': float(conservation_score),
+                    'type': 'conservation_analysis'
+                },
                 'confidence': self._calculate_confidence(stability_score, structural_score, conservation_score)
             }
         except Exception as e:
             logger.error(f"Error in mutation effect prediction: {e}")
-            return {'error': str(e)}
+            return {
+                'start': position,
+                'end': position + 1,
+                'score': 0.0,
+                'type': 'mutation_effect_error',
+                'error': str(e)
+            }
 
     def _calculate_stability_impact(self, sequence: str, position: int, new_aa: str) -> float:
         """Calculate stability impact of mutation using ESM model"""

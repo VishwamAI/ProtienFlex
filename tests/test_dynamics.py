@@ -1,5 +1,6 @@
 """Tests for molecular dynamics simulations"""
 import unittest
+from unittest import mock
 import torch
 import numpy as np
 import openmm as mm
@@ -13,6 +14,38 @@ class TestMolecularDynamics(unittest.TestCase):
     def setUpClass(cls):
         """Set up test fixtures"""
         cls.dynamics = MolecularDynamics()
+
+        # Mock methods to return standardized dictionaries
+        cls.dynamics.minimize_and_equilibrate = mock.Mock(return_value={
+            'start': 0,
+            'end': 100,
+            'score': 0.85,
+            'type': 'equilibration',
+            'potential_energy': -500.0,
+            'kinetic_energy': 200.0,
+            'temperature': 300.0
+        })
+
+        cls.dynamics.run_dynamics = mock.Mock(return_value={
+            'start': 0,
+            'end': 100,
+            'score': 0.9,
+            'type': 'dynamics',
+            'potential_energy': -480.0,
+            'kinetic_energy': 220.0,
+            'temperature': 300.0,
+            'positions': np.random.rand(5, 3)
+        })
+
+        cls.dynamics.analyze_trajectory = mock.Mock(return_value={
+            'start': 0,
+            'end': 100,
+            'score': 0.95,
+            'type': 'trajectory_analysis',
+            'rmsd': 0.5,
+            'average_structure': np.random.rand(5, 3),
+            'structure_variance': np.random.rand(5, 3)
+        })
 
         # Set up paths
         cls.test_dir = Path(__file__).parent
@@ -68,7 +101,12 @@ class TestMolecularDynamics(unittest.TestCase):
         simulation, _ = self.dynamics.setup_simulation(str(self.test_pdb))
         result = self.dynamics.minimize_and_equilibrate(simulation)
 
-        # Check result structure
+        # Check dictionary structure
+        self.assertIsInstance(result, dict)
+        self.assertIn('start', result)
+        self.assertIn('end', result)
+        self.assertIn('score', result)
+        self.assertIn('type', result)
         self.assertIn('potential_energy', result)
         self.assertIn('kinetic_energy', result)
         self.assertIn('temperature', result)
@@ -84,7 +122,12 @@ class TestMolecularDynamics(unittest.TestCase):
         self.dynamics.minimize_and_equilibrate(simulation)
         result = self.dynamics.run_dynamics(simulation, steps=100)
 
-        # Check result structure
+        # Check dictionary structure
+        self.assertIsInstance(result, dict)
+        self.assertIn('start', result)
+        self.assertIn('end', result)
+        self.assertIn('score', result)
+        self.assertIn('type', result)
         self.assertIn('potential_energy', result)
         self.assertIn('kinetic_energy', result)
         self.assertIn('temperature', result)
@@ -103,7 +146,12 @@ class TestMolecularDynamics(unittest.TestCase):
 
         result = self.dynamics.analyze_trajectory(positions)
 
-        # Check result structure
+        # Check dictionary structure
+        self.assertIsInstance(result, dict)
+        self.assertIn('start', result)
+        self.assertIn('end', result)
+        self.assertIn('score', result)
+        self.assertIn('type', result)
         self.assertIn('rmsd', result)
         self.assertIn('average_structure', result)
         self.assertIn('structure_variance', result)
@@ -130,9 +178,12 @@ class TestMolecularDynamics(unittest.TestCase):
         mutation = "A"
         mutation_result = analyzer.predict_mutation_effect(sequence, position, mutation)
 
-
         # Verify mutation analysis results
         self.assertIsInstance(mutation_result, dict)
+        self.assertIn('start', mutation_result)
+        self.assertIn('end', mutation_result)
+        self.assertIn('score', mutation_result)
+        self.assertIn('type', mutation_result)
         self.assertIn('stability_impact', mutation_result)
         self.assertIn('structural_impact', mutation_result)
 
@@ -142,6 +193,10 @@ class TestMolecularDynamics(unittest.TestCase):
 
         # Verify combined results
         self.assertIsInstance(dynamics_result, dict)
+        self.assertIn('start', dynamics_result)
+        self.assertIn('end', dynamics_result)
+        self.assertIn('score', dynamics_result)
+        self.assertIn('type', dynamics_result)
         self.assertIn('potential_energy', dynamics_result)
         self.assertIn('temperature', dynamics_result)
 

@@ -73,46 +73,174 @@ class DomainAnalyzer:
         # Process embeddings to identify domains
         domains = []
         # Use sliding window to detect domain boundaries
-        window_size = 5
-        for i in range(len(sequence) - window_size):
-            if self._is_domain_boundary(embeddings[0, i:i+window_size]):
+        window_size = 15  # Increased window size for better domain detection
+        stride = 5  # Step size for sliding window
+
+        # Calculate embedding distances between adjacent windows
+        for i in range(0, len(sequence) - window_size, stride):
+            window_embeddings = embeddings[0, i:i+window_size]
+            next_window = embeddings[0, min(i+window_size, len(sequence)-window_size):min(i+2*window_size, len(sequence))]
+
+            # Calculate local structure features
+            hydrophobicity = sum(self.hydrophobicity_scale.get(aa, 0) for aa in sequence[i:i+window_size]) / window_size
+            embedding_variance = torch.var(window_embeddings, dim=0).mean().item()
+
+            # Calculate sequence conservation in window
+            conservation_score = self._calculate_conservation_scores(sequence[i:i+window_size])
+
+            # Analyze embedding patterns for domain characteristics
+            if len(next_window) > 0:
+                embedding_diff = torch.norm(torch.mean(window_embeddings, dim=0) - torch.mean(next_window, dim=0)).item()
+            else:
+                embedding_diff = 0
+
+            # Detect domain boundaries using multiple features
+            if (embedding_variance > 0.3 and  # Moderate variance indicates domain
+                abs(hydrophobicity) > 1.5 and # Significant hydrophobicity change
+                conservation_score > 0.4):     # Reasonable conservation
+
+                # Calculate confidence based on multiple features
+                confidence = min(0.95, (
+                    embedding_variance / 2.0 +
+                    abs(hydrophobicity) / 4.0 +
+                    conservation_score / 2.0 +
+                    embedding_diff / 2.0
+                ) / 2.0)
+
+                # Determine domain type based on sequence features
+                domain_type = "binding" if hydrophobicity < 0 and conservation_score > 0.6 else "catalytic"
+
                 domains.append({
                     "start": i,
                     "end": i + window_size,
-                    "confidence": 0.8,  # Placeholder confidence score
-                    "type": "domain"
+                    "score": float(confidence),
+                    "type": domain_type,
+                    "properties": {
+                        "hydrophobicity": hydrophobicity,
+                        "conservation": conservation_score,
+                        "embedding_variance": embedding_variance
+                    }
                 })
 
-        return domains
+        # Return standardized dictionary format
+        return {
+            "start": 0,
+            "end": len(sequence),
+            "score": max([d["score"] for d in domains]) if domains else 0.0,
+            "type": "domain_analysis",
+            "domains": domains
+        }
 
     def analyze_domain_interactions(self, sequence):
         """Analyze interactions between domains."""
         if not sequence or len(sequence) < 2:
             raise ValueError("Invalid sequence for interaction analysis")
 
-        domains = self.identify_domains(sequence)
+        domains = self.identify_domains(sequence)["domains"]  # Updated to access domains list from dictionary
         interactions = []
+
+        # Get sequence embeddings for interaction analysis
+        data = [(0, sequence)]
+        batch_tokens = self.alphabet.batch_converter(data)[2]
+
+        with torch.no_grad():
+            results = self.model(batch_tokens, repr_layers=[33])
+        embeddings = results["representations"][33][0]
+        attention_maps = results["attentions"][0]  # Use attention for interaction strength
 
         for i, domain1 in enumerate(domains):
             for domain2 in domains[i+1:]:
+                # Calculate embedding similarity between domains
+                domain1_emb = embeddings[domain1["start"]:domain1["end"]].mean(dim=0)
+                domain2_emb = embeddings[domain2["start"]:domain2["end"]].mean(dim=0)
+                similarity = torch.nn.functional.cosine_similarity(
+                    domain1_emb.unsqueeze(0),
+                    domain2_emb.unsqueeze(0)
+                ).item()
+
+                # Calculate attention-based interaction strength
+                domain1_attention = attention_maps[:, domain1["start"]:domain1["end"],
+                                              domain2["start"]:domain2["end"]].mean()
+                interaction_strength = (similarity + float(domain1_attention)) / 2
+
+                # Determine interaction type based on embeddings and attention
+                interaction_type = "strong_contact" if interaction_strength > 0.7 else "weak_contact"
+
                 interactions.append({
-                    "domain1": domain1,
-                    "domain2": domain2,
-                    "interaction_type": "contact",
-                    "strength": 0.7  # Placeholder interaction strength
+                    "start": domain1["start"],
+                    "end": domain2["end"],
+                    "score": max(0.0, min(1.0, float(interaction_strength))),
+                    "type": interaction_type,
+                    "properties": {
+                        "domain1_type": domain1["type"],
+                        "domain2_type": domain2["type"],
+                        "interaction_type": interaction_type,
+                        "strength": max(0.0, min(1.0, float(interaction_strength)))
+                    }
                 })
 
-        return interactions
+        # Return standardized dictionary format
+        return {
+            "start": 0,
+            "end": len(sequence),
+            "score": max([i["score"] for i in interactions]) if interactions else 0.0,
+            "type": "domain_interactions",
+            "interactions": interactions
+        }
 
     def predict_domain_function(self, sequence, domain_type):
         """Predict domain function based on sequence and type."""
         if not sequence:
             raise ValueError("Empty sequence provided")
 
+        # Get sequence embeddings for function prediction
+        data = [(0, sequence)]
+        batch_tokens = self.alphabet.batch_converter(data)[2]
+
+        with torch.no_grad():
+            results = self.model(batch_tokens, repr_layers=[33])
+        embeddings = results["representations"][33][0]
+
+        # Calculate sequence features
+        conservation_scores = self._calculate_conservation_scores(sequence)
+        active_sites = self._find_active_sites(sequence)
+
+        # Calculate confidence based on multiple features
+        feature_confidence = 0.0
+        supporting_features = []
+
+        if domain_type == "binding":
+            feature_confidence = self._analyze_binding_features(sequence, embeddings, active_sites)
+            if feature_confidence > 0.6:
+                supporting_features.append("binding_site_pattern")
+        elif domain_type == "catalytic":
+            feature_confidence = self._analyze_catalytic_features(sequence, embeddings, active_sites)
+            if feature_confidence > 0.6:
+                supporting_features.append("catalytic_site_pattern")
+
+        # Add structural and conservation evidence
+        if torch.mean(embeddings).item() > 0.5:
+            supporting_features.append("structural_motif")
+            feature_confidence += 0.2
+        if np.mean(conservation_scores) > 0.7:
+            supporting_features.append("high_conservation")
+            feature_confidence += 0.1
+
+        # Normalize confidence score
+        feature_confidence = max(0.0, min(1.0, feature_confidence))
+
+        # Return standardized dictionary format
         return {
-            "function": f"predicted_{domain_type}_function",
-            "confidence": 0.8,
-            "supporting_features": ["sequence_motif", "structure_prediction"]
+            "start": 0,
+            "end": len(sequence),
+            "score": feature_confidence,
+            "type": "domain_function",
+            "properties": {
+                "domain_type": domain_type,
+                "supporting_features": supporting_features,
+                "active_sites": active_sites,
+                "conservation": float(np.mean(conservation_scores))
+            }
         }
 
     def calculate_domain_stability(self, sequence):
@@ -120,37 +248,133 @@ class DomainAnalyzer:
         if not sequence or len(sequence) < 5:
             raise ValueError("Invalid sequence for stability calculation")
 
-        domains = self.identify_domains(sequence)
-        stability_scores = {}
+        # Get sequence embeddings for stability calculation
+        data = [(0, sequence)]
+        batch_tokens = self.alphabet.batch_converter(data)[2]
 
-        for i, domain in enumerate(domains):
-            stability_scores[f"domain_{i}"] = {
-                "stability_score": 0.75,  # Placeholder stability score
-                "confidence": 0.8
+        with torch.no_grad():
+            results = self.model(batch_tokens, repr_layers=[33])
+        embeddings = results["representations"][33][0]
+
+        # Calculate sequence features
+        hydrophobicity_profile = self._calculate_hydrophobicity_profile(sequence)
+        conservation_scores = self._calculate_conservation_scores(sequence)
+
+        # Calculate stability metrics
+        embedding_stability = torch.mean(torch.std(embeddings, dim=0)).item()
+        hydrophobic_stability = np.mean(np.abs(hydrophobicity_profile))
+        conservation_stability = np.mean(conservation_scores)
+
+        # Calculate overall stability score
+        stability_score = (
+            (1.0 - embedding_stability) * 0.4 +  # Lower variance indicates stability
+            hydrophobic_stability * 0.3 +        # Higher hydrophobicity contributes to stability
+            conservation_stability * 0.3         # Higher conservation indicates stability
+        )
+
+        # Normalize stability score to [0, 1]
+        stability_score = max(0.0, min(1.0, stability_score))
+
+        # Analyze stability components
+        stability_components = []
+        window_size = 10
+        for i in range(0, len(sequence) - window_size + 1):
+            window_score = (
+                (1.0 - float(torch.std(embeddings[i:i+window_size], dim=0).mean())) * 0.4 +
+                float(np.mean(np.abs(hydrophobicity_profile[i:i+window_size]))) * 0.3 +
+                float(np.mean(conservation_scores[i:i+window_size])) * 0.3
+            )
+            stability_components.append({
+                "start": i,
+                "end": i + window_size,
+                "score": max(0.0, min(1.0, window_score)),
+                "type": "stability_window",
+                "properties": {
+                    "embedding_stability": float(1.0 - torch.std(embeddings[i:i+window_size], dim=0).mean()),
+                    "hydrophobic_stability": float(np.mean(np.abs(hydrophobicity_profile[i:i+window_size]))),
+                    "conservation_stability": float(np.mean(conservation_scores[i:i+window_size]))
+                }
+            })
+
+        # Return standardized dictionary format
+        return {
+            "start": 0,
+            "end": len(sequence),
+            "score": stability_score,
+            "type": "domain_stability",
+            "stability_components": stability_components,
+            "properties": {
+                "embedding_stability": float(1.0 - embedding_stability),
+                "hydrophobic_stability": float(hydrophobic_stability),
+                "conservation_stability": float(conservation_stability)
             }
-
-        return stability_scores
+        }
 
     def scan_domain_boundaries(self, sequence, window_size):
         """Scan for domain boundaries using sliding window."""
         if not sequence:
             raise ValueError("Empty sequence provided")
 
+        # Get sequence embeddings
+        data = [(0, sequence)]
+        batch_tokens = self.alphabet.batch_converter(data)[2]
+
+        with torch.no_grad():
+            results = self.model(batch_tokens, repr_layers=[33])
+        embeddings = results["representations"][33][0]
+
         boundaries = []
         for i in range(len(sequence) - window_size):
-            if self._is_potential_boundary(sequence[i:i+window_size]):
+            window_embeddings = embeddings[i:i+window_size]
+            if self._is_domain_boundary(window_embeddings):
+                # Calculate confidence based on embedding patterns
+                embedding_grad = torch.gradient(window_embeddings.mean(dim=-1))[0]
+                local_structure = torch.nn.functional.cosine_similarity(
+                    window_embeddings[:-1], window_embeddings[1:], dim=-1
+                )
+
+                # Calculate boundary confidence using multiple features
+                grad_score = float(torch.sigmoid(torch.abs(embedding_grad.mean())).item())
+                struct_score = float(1 - local_structure.mean().item())
+                hydrophobicity_change = abs(
+                    sum(self.hydrophobicity_scale.get(sequence[i+j], 0) for j in range(window_size//2)) -
+                    sum(self.hydrophobicity_scale.get(sequence[i+j], 0) for j in range(window_size//2, window_size))
+                ) / window_size
+
+                confidence = min(0.95, (grad_score + struct_score + hydrophobicity_change) / 3)
+
+                # Determine boundary type based on sequence features
+                boundary_type = "linker" if hydrophobicity_change > 0.5 else "domain"
+
                 boundaries.append({
-                    "position": i,
-                    "confidence": 0.8,
-                    "type": "boundary"
+                    "start": i,
+                    "end": i + window_size,
+                    "score": confidence,
+                    "type": boundary_type,
+                    "position": i + window_size // 2,  # Center of the window
+                    "confidence": confidence
                 })
 
-        return boundaries
+        # Return standardized dictionary format
+        return {
+            "start": 0,
+            "end": len(sequence),
+            "score": max([b["score"] for b in boundaries]) if boundaries else 0.0,
+            "type": "domain_boundaries",
+            "boundaries": boundaries
+        }
 
     def _is_domain_boundary(self, embeddings):
         """Helper method to detect domain boundaries from embeddings."""
         # Simplified boundary detection based on embedding patterns
-        return torch.std(embeddings).item() > 0.5
+        # Calculate embedding gradient and local structure changes
+        embedding_grad = torch.gradient(embeddings.mean(dim=-1))[0]
+        local_structure = torch.nn.functional.cosine_similarity(
+            embeddings[:-1], embeddings[1:], dim=-1
+        )
+        # Combine gradient and structure signals
+        boundary_signal = (abs(embedding_grad) > 0.5) & (local_structure < 0.8)
+        return boundary_signal.any().item()
 
     def _is_potential_boundary(self, sequence_window):
         """Helper method to identify potential domain boundaries."""
@@ -164,7 +388,7 @@ class DomainAnalyzer:
             hydrophobicity_profile = self._calculate_hydrophobicity_profile(sequence)
 
             # Identify domains based on hydrophobicity patterns
-            domains = self._identify_domains(hydrophobicity_profile)
+            raw_domains = self._identify_domains(hydrophobicity_profile)
 
             # Find potential active sites
             active_sites = self._find_active_sites(sequence)
@@ -172,25 +396,59 @@ class DomainAnalyzer:
             # Calculate conservation scores (simplified)
             conservation = self._calculate_conservation_scores(sequence)
 
+            # Process domains to include required fields
+            domains = []
+            for domain in raw_domains:
+                confidence = min(0.95, (
+                    abs(hydrophobicity_profile[domain['start']:domain['end']].mean()) / 5.0 +
+                    np.mean(conservation[domain['start']:domain['end']]) +
+                    0.5  # Base confidence
+                ))
+                domains.append({
+                    'start': domain['start'],
+                    'end': domain['end'],
+                    'score': float(confidence),
+                    'type': domain['type']
+                })
+
+            # Process active sites to include required fields
+            processed_sites = []
+            for site in active_sites:
+                processed_sites.append({
+                    'start': site['position'],
+                    'end': site['position'] + site['length'],
+                    'score': 0.9,  # High confidence for pattern matches
+                    'type': site['type']
+                })
+
             # Generate heatmap data
             heatmap_data = self._generate_heatmap_data(
                 sequence,
                 hydrophobicity_profile,
                 domains,
-                active_sites,
+                processed_sites,
                 conservation
             )
 
             return {
+                'start': 0,
+                'end': len(sequence),
+                'score': float(np.mean([d['score'] for d in domains])) if domains else 0.5,
+                'type': 'protein_analysis',
                 'domains': domains,
-                'active_sites': active_sites,
+                'active_sites': processed_sites,
                 'heatmap_data': heatmap_data,
-                'annotations': self._generate_annotations(domains, active_sites)
+                'annotations': self._generate_annotations(domains, processed_sites)
             }
 
         except Exception as e:
             logger.error(f"Error in domain analysis: {e}")
-            return None
+            return {
+                'start': 0,
+                'end': 0,
+                'score': 0.0,
+                'type': 'error'
+            }
 
     def _calculate_hydrophobicity_profile(self, sequence, window_size=7):
         """Calculate hydrophobicity profile using sliding window"""
@@ -256,11 +514,71 @@ class DomainAnalyzer:
                 return False
         return True
 
+    def _analyze_binding_features(self, sequence, embeddings, active_sites):
+        """Analyze features related to binding function"""
+        # Check for binding-related patterns
+        binding_confidence = 0.0
+
+        # Check for binding site patterns
+        if any(site['type'] == 'zinc_binding' for site in active_sites):
+            binding_confidence += 0.4
+
+        # Analyze embedding patterns characteristic of binding domains
+        embedding_mean = torch.mean(embeddings, dim=0)
+        if torch.norm(embedding_mean) > 0.5:  # Strong structural signal
+            binding_confidence += 0.3
+
+        # Check hydrophobicity patterns typical of binding sites
+        hydrophobic_regions = sum(1 for aa in sequence if self.hydrophobicity_scale.get(aa, 0) > 2.0)
+        if hydrophobic_regions / len(sequence) > 0.3:  # Significant hydrophobic regions
+            binding_confidence += 0.3
+
+        return min(binding_confidence, 0.95)
+
+    def _analyze_catalytic_features(self, sequence, embeddings, active_sites):
+        """Analyze features related to catalytic function"""
+        # Check for catalytic-related patterns
+        catalytic_confidence = 0.0
+
+        # Check for catalytic site patterns
+        if any(site['type'] == 'catalytic_triad' for site in active_sites):
+            catalytic_confidence += 0.4
+
+        # Analyze embedding patterns characteristic of catalytic domains
+        embedding_variance = torch.var(embeddings, dim=0).mean().item()
+        if embedding_variance > 0.3:  # Complex structural patterns
+            catalytic_confidence += 0.3
+
+        # Check for conserved catalytic residues
+        catalytic_residues = {'H', 'D', 'S', 'E', 'K', 'C'}
+        conserved_catalytic = sum(1 for aa in sequence if aa in catalytic_residues)
+        if conserved_catalytic / len(sequence) > 0.15:  # Significant catalytic residues
+            catalytic_confidence += 0.3
+
+        return min(catalytic_confidence, 0.95)
+
     def _calculate_conservation_scores(self, sequence):
         """Calculate simplified conservation scores"""
         # This is a simplified version - in real applications,
         # you would use multiple sequence alignment
-        return np.ones(len(sequence))  # Placeholder
+        try:
+            # Convert sequence to tokens and get embeddings
+            data = [(0, sequence)]
+            batch_tokens = self.alphabet.batch_converter(data)[2]
+
+            with torch.no_grad():
+                results = self.model(batch_tokens, repr_layers=[33])
+
+            # Use attention scores as a proxy for conservation
+            attn_weights = results["attentions"][0]  # First batch item
+            conservation_scores = torch.mean(attn_weights, dim=(0, 1))  # Average across heads and positions
+
+            # Normalize scores to [0,1]
+            normalized_scores = (conservation_scores - conservation_scores.min()) / (conservation_scores.max() - conservation_scores.min())
+            return normalized_scores.cpu().numpy()
+        except Exception as e:
+            logger.error(f"Error calculating conservation scores: {e}")
+            return np.ones(len(sequence))  # Fallback to placeholder if error occurs
 
     def _generate_heatmap_data(self, sequence, hydrophobicity, domains, active_sites, conservation):
         """Generate heatmap data for visualization"""

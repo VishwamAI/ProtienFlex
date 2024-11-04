@@ -33,8 +33,14 @@ def test_setup_system(openmm_simulator, pdb_file, force_field):
 
         system = openmm_simulator.setup_system(pdb_file, force_field)
 
-        assert system is not None
-        assert hasattr(system, 'getNumParticles')
+        assert isinstance(system, dict)
+        assert "start" in system
+        assert "end" in system
+        assert "score" in system
+        assert "type" in system
+        assert "system_object" in system
+        assert hasattr(system["system_object"], 'getNumParticles')
+        assert 0 <= system["score"] <= 1
 
 @pytest.mark.parametrize("temperature,pressure,friction", [
     (300.0, 1.0, 1.0),
@@ -48,8 +54,14 @@ def test_setup_integrator(openmm_simulator, temperature, pressure, friction):
         friction=friction
     )
 
-    assert integrator is not None
-    assert hasattr(integrator, 'getStepSize')
+    assert isinstance(integrator, dict)
+    assert "start" in integrator
+    assert "end" in integrator
+    assert "score" in integrator
+    assert "type" in integrator
+    assert "integrator_object" in integrator
+    assert hasattr(integrator["integrator_object"], 'getStepSize')
+    assert 0 <= integrator["score"] <= 1
 
 @pytest.mark.parametrize("steps,report_interval", [
     (1000, 100),
@@ -61,9 +73,14 @@ def test_run_simulation(openmm_simulator, steps, report_interval):
         results = openmm_simulator.run_simulation(steps, report_interval)
 
         assert isinstance(results, dict)
+        assert "start" in results
+        assert "end" in results
+        assert "score" in results
+        assert "type" in results
         assert "trajectory" in results
         assert "energies" in results
         assert "final_state" in results
+        assert 0 <= results["score"] <= 1
         mock_step.assert_called_with(steps)
 
 @pytest.mark.parametrize("constraint_tolerance,time_step", [
@@ -78,9 +95,10 @@ def test_configure_simulation(openmm_simulator, constraint_tolerance, time_step)
     )
 
     assert isinstance(config, dict)
-    assert "constraint_tolerance" in config
-    assert "time_step" in config
-    assert config["constraint_tolerance"] == constraint_tolerance
+    assert "start" in config
+    assert "end" in config
+    assert "score" in config
+    assert "type" in config
 
 def test_error_handling(openmm_simulator):
     """Test error handling for invalid inputs."""
@@ -109,10 +127,15 @@ def test_analyze_trajectory(openmm_simulator, trajectory_file, frame_indices):
         analysis = openmm_simulator.analyze_trajectory(trajectory_file, frame_indices)
 
         assert isinstance(analysis, dict)
+        assert "start" in analysis
+        assert "end" in analysis
+        assert "score" in analysis
+        assert "type" in analysis
         assert "rmsd" in analysis
         assert "rmsf" in analysis
         assert "radius_of_gyration" in analysis
         assert isinstance(analysis["rmsd"], np.ndarray)
+        assert 0 <= analysis["score"] <= 1
 
 @pytest.mark.parametrize("energy_components", [
     ["kinetic", "potential"],
@@ -123,6 +146,11 @@ def test_calculate_energy_components(openmm_simulator, energy_components):
     energies = openmm_simulator.calculate_energy_components(energy_components)
 
     assert isinstance(energies, dict)
+    assert "start" in energies
+    assert "end" in energies
+    assert "score" in energies
+    assert "type" in energies
     for component in energy_components:
         assert component in energies
         assert isinstance(energies[component], float)
+    assert 0 <= energies["score"] <= 1

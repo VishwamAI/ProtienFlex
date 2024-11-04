@@ -28,6 +28,7 @@ import numpy as np
 from Bio.PDB import *
 import biotite.structure as struc
 import biotite.structure.io as strucio
+from typing import Dict, List, Optional, Union
 
 logger = logging.getLogger(__name__)
 
@@ -86,11 +87,93 @@ class ProteinNLPAnalyzer:
                 function=function_prediction
             )
 
-            return description
+            # Find the most significant domain for position information
+            if domains:
+                best_domain = max(domains, key=lambda x: x['confidence'])
+                start = best_domain['start']
+                end = best_domain['end']
+            else:
+                # Default to analyzing the first portion of the sequence
+                start = 0
+                end = min(50, len(sequence))
+
+            # Calculate overall analysis score
+            analysis_scores = []
+            if stability and stability.get('is_stable') is not None:
+                analysis_scores.append(0.8 if stability['is_stable'] else 0.4)
+            analysis_scores.append(complexity / 100)  # Normalized complexity score
+            if domains:
+                analysis_scores.append(max(d['confidence'] for d in domains))
+            overall_score = np.mean(analysis_scores) if analysis_scores else 0.5
+
+            return {
+                'start': start,
+                'end': end,
+                'score': float(overall_score),
+                'type': 'sequence_analysis',
+                'description': description,
+                'properties': {
+                    'start': start,
+                    'end': end,
+                    'score': float(overall_score),
+                    'type': 'property_analysis',
+                    'molecular_weight': {
+                        'start': 0,
+                        'end': len(sequence),
+                        'score': float(molecular_weight/1000),  # Normalize by 1000
+                        'type': 'molecular_weight',
+                        'value': float(molecular_weight)
+                    },
+                    'isoelectric_point': {
+                        'start': 0,
+                        'end': len(sequence),
+                        'score': float(min(1.0, isoelectric_point/14)),  # Normalize by pH scale
+                        'type': 'isoelectric_point',
+                        'value': float(isoelectric_point)
+                    },
+                    'aromaticity': {
+                        'start': 0,
+                        'end': len(sequence),
+                        'score': float(aromaticity),
+                        'type': 'aromaticity',
+                        'value': float(aromaticity)
+                    },
+                    'instability_index': {
+                        'start': 0,
+                        'end': len(sequence),
+                        'score': float(max(0, 1 - instability_index/100)),
+                        'type': 'instability_index',
+                        'value': float(instability_index)
+                    },
+                    'hydrophobicity': {
+                        'start': 0,
+                        'end': len(sequence),
+                        'score': float(min(1.0, (hydrophobicity + 4.5)/9.0)),  # Normalize to [0,1]
+                        'type': 'hydrophobicity',
+                        'value': float(hydrophobicity)
+                    },
+                    'complexity': {
+                        'start': 0,
+                        'end': len(sequence),
+                        'score': float(complexity/100),
+                        'type': 'complexity',
+                        'value': float(complexity)
+                    },
+                    'domains': domains,
+                    'stability': stability,
+                    'predicted_function': function_prediction
+                }
+            }
 
         except Exception as e:
             logger.error(f"Error in sequence analysis: {e}")
-            return "Error analyzing sequence"
+            return {
+                'start': 0,
+                'end': len(sequence),
+                'score': 0.0,
+                'type': 'sequence_analysis_error',
+                'error': str(e)
+            }
 
     def _calculate_hydrophobicity(self, sequence):
         """Calculate average hydrophobicity using Kyte-Doolittle scale"""
@@ -110,15 +193,97 @@ class ProteinNLPAnalyzer:
     def _predict_domains(self, sequence):
         """Predict protein domains using sequence patterns"""
         domains = []
-        # Simple domain prediction based on sequence patterns
-        if len(sequence) > 50:
-            for i in range(0, len(sequence) - 50, 25):
-                segment = sequence[i:i+50]
-                hydrophobicity = self._calculate_hydrophobicity(segment)
-                if hydrophobicity > 2.0:
-                    domains.append(f"Hydrophobic domain ({i+1}-{i+50})")
-                elif hydrophobicity < -2.0:
-                    domains.append(f"Hydrophilic domain ({i+1}-{i+50})")
+        window_size = 50
+        stride = 10
+
+        # Analyze sequence patterns and structure
+        for i in range(0, len(sequence) - window_size, stride):
+            segment = sequence[i:i+window_size]
+
+            # Calculate segment properties
+            hydrophobicity = self._calculate_hydrophobicity(segment)
+            complexity = self._calculate_sequence_complexity(segment)
+
+            # Get segment embeddings for structural analysis
+            inputs = self.tokenizer(segment, return_tensors="pt", padding=True, truncation=True)
+            with torch.no_grad():
+                outputs = self.model(**inputs)
+                segment_embeddings = outputs.logits
+
+            # Analyze structural features
+            embedding_variance = torch.var(segment_embeddings).item()
+            pattern_strength = torch.mean(torch.abs(segment_embeddings)).item()
+
+            # Identify domains based on multiple features
+            if (hydrophobicity > 1.5 and complexity > 60 and pattern_strength > 0.5):
+                domains.append({
+                    "start": i+1,
+                    "end": i+window_size,
+                    "score": float(pattern_strength),
+                    "type": "Functional",
+                    "properties": {
+                        "start": i+1,
+                        "end": i+window_size,
+                        "score": float(pattern_strength),
+                        "type": "domain_properties",
+                        "hydrophobicity": {
+                            "start": i+1,
+                            "end": i+window_size,
+                            "score": float(min(1.0, (hydrophobicity + 4.5)/9.0)),
+                            "type": "hydrophobicity",
+                            "value": float(hydrophobicity)
+                        },
+                        "complexity": {
+                            "start": i+1,
+                            "end": i+window_size,
+                            "score": float(complexity/100),
+                            "type": "complexity",
+                            "value": float(complexity)
+                        },
+                        "structural_score": {
+                            "start": i+1,
+                            "end": i+window_size,
+                            "score": float(min(1.0, embedding_variance)),
+                            "type": "structural_score",
+                            "value": float(embedding_variance)
+                        }
+                    }
+                })
+            elif (abs(hydrophobicity) > 2.0 and embedding_variance > 0.1):
+                domain_type = "Hydrophobic" if hydrophobicity > 0 else "Hydrophilic"
+                domains.append({
+                    "start": i+1,
+                    "end": i+window_size,
+                    "score": float(abs(hydrophobicity)/4),
+                    "type": domain_type,
+                    "properties": {
+                        "start": i+1,
+                        "end": i+window_size,
+                        "score": float(abs(hydrophobicity)/4),
+                        "type": "domain_properties",
+                        "hydrophobicity": {
+                            "start": i+1,
+                            "end": i+window_size,
+                            "score": float(min(1.0, (hydrophobicity + 4.5)/9.0)),
+                            "type": "hydrophobicity",
+                            "value": float(hydrophobicity)
+                        },
+                        "complexity": {
+                            "start": i+1,
+                            "end": i+window_size,
+                            "score": float(complexity/100),
+                            "type": "complexity",
+                            "value": float(complexity)
+                        },
+                        "structural_score": {
+                            "start": i+1,
+                            "end": i+window_size,
+                            "score": float(min(1.0, embedding_variance)),
+                            "type": "structural_score",
+                            "value": float(embedding_variance)
+                        }
+                    }
+                })
         return domains
 
     def _analyze_stability(self, sequence):
@@ -128,25 +293,106 @@ class ProteinNLPAnalyzer:
             instability_index = analysis.instability_index()
             flexibility = analysis.flexibility()
             stability = {
-                'index': instability_index,
-                'is_stable': instability_index < 40,
-                'flexibility': np.mean(flexibility)
+                'start': 0,
+                'end': len(sequence),
+                'score': float(max(0, 1 - instability_index/100)),  # Normalize score
+                'type': 'stability_analysis',
+                'properties': {
+                    'start': 0,
+                    'end': len(sequence),
+                    'score': float(max(0, 1 - instability_index/100)),
+                    'type': 'stability_properties',
+                    'instability_index': {
+                        'start': 0,
+                        'end': len(sequence),
+                        'score': float(max(0, 1 - instability_index/100)),
+                        'type': 'instability_index',
+                        'value': float(instability_index)
+                    },
+                    'flexibility': {
+                        'start': 0,
+                        'end': len(sequence),
+                        'score': float(min(1.0, np.mean(flexibility))),
+                        'type': 'flexibility',
+                        'value': float(np.mean(flexibility))
+                    },
+                    'is_stable': {
+                        'start': 0,
+                        'end': len(sequence),
+                        'score': 1.0 if instability_index < 40 else 0.0,
+                        'type': 'stability_state',
+                        'value': instability_index < 40
+                    }
+                }
             }
             return stability
         except Exception as e:
             logger.error(f"Error in stability analysis: {e}")
-            return None
+            return {
+                'start': 0,
+                'end': len(sequence),
+                'score': 0.0,
+                'type': 'stability_analysis_error',
+                'error': str(e)
+            }
 
     def _predict_function(self, embeddings):
         """Predict protein function based on sequence embeddings"""
         # Simple function prediction based on embedding patterns
-        embedding_mean = torch.mean(embeddings).item()
-        if embedding_mean > 0.5:
-            return "Likely enzymatic activity"
-        elif embedding_mean > 0:
-            return "Possible structural role"
-        else:
-            return "Potential regulatory function"
+        embedding_features = torch.cat([
+            torch.mean(embeddings, dim=0),
+            torch.var(embeddings, dim=0),
+            torch.max(embeddings, dim=0)[0],
+            torch.min(embeddings, dim=0)[0]
+        ])
+
+        # Calculate feature scores for different function categories
+        enzymatic_score = torch.sigmoid(torch.sum(embedding_features[:100])).item()
+        structural_score = torch.sigmoid(torch.sum(embedding_features[100:200])).item()
+        regulatory_score = torch.sigmoid(torch.sum(embedding_features[200:300])).item()
+
+        # Determine function based on highest score
+        scores = [(enzymatic_score, "enzymatic activity"),
+                 (structural_score, "structural role"),
+                 (regulatory_score, "regulatory function")]
+
+        max_score, predicted_function = max(scores)
+        confidence = "Likely" if max_score > 0.7 else "Possible"
+
+        return {
+            'start': 0,
+            'end': embeddings.shape[1],
+            'score': float(max_score),
+            'type': 'function_prediction',
+            'prediction': {
+                'start': 0,
+                'end': embeddings.shape[1],
+                'score': float(max_score),
+                'type': 'predicted_function',
+                'function': f"{confidence} {predicted_function}",
+                'confidence': confidence,
+                'scores': {
+                    'enzymatic': {
+                        'start': 0,
+                        'end': embeddings.shape[1],
+                        'score': float(enzymatic_score),
+                        'type': 'enzymatic_score'
+                    },
+                    'structural': {
+                        'start': 0,
+                        'end': embeddings.shape[1],
+                        'score': float(structural_score),
+                        'type': 'structural_score'
+                    },
+                    'regulatory': {
+                        'start': 0,
+                        'end': embeddings.shape[1],
+                        'score': float(regulatory_score),
+                        'type': 'regulatory_score'
+                    }
+                }
+            }
+        }
 
     def _generate_description(self, **properties):
         """Generate natural language description of protein properties"""
@@ -179,3 +425,105 @@ class ProteinNLPAnalyzer:
         description += f"""Based on the sequence analysis, this protein may have {properties['function'].lower()}."""
 
         return description
+
+    def compare_sequences(self, seq1: str, seq2: str) -> Dict:
+        """Compare two protein sequences and analyze their similarities"""
+        try:
+            # Get embeddings for both sequences
+            inputs1 = self.tokenizer(seq1, return_tensors="pt", padding=True, truncation=True)
+            inputs2 = self.tokenizer(seq2, return_tensors="pt", padding=True, truncation=True)
+
+            with torch.no_grad():
+                emb1 = self.model(**inputs1).logits
+                emb2 = self.model(**inputs2).logits
+
+            # Calculate similarity score
+            similarity = torch.cosine_similarity(emb1.mean(dim=1), emb2.mean(dim=1)).item()
+
+            # Calculate additional comparison metrics
+            length_similarity = 1 - abs(len(seq1) - len(seq2)) / max(len(seq1), len(seq2))
+
+            return {
+                'start': 0,
+                'end': max(len(seq1), len(seq2)),
+                'score': float(similarity),
+                'type': 'sequence_comparison',
+                'comparison': {
+                    'start': 0,
+                    'end': max(len(seq1), len(seq2)),
+                    'score': float(similarity),
+                    'type': 'comparison_details',
+                    'metrics': {
+                        'similarity': {
+                            'start': 0,
+                            'end': max(len(seq1), len(seq2)),
+                            'score': float(similarity),
+                            'type': 'similarity_score',
+                            'value': float(similarity)
+                        },
+                        'length_comparison': {
+                            'start': 0,
+                            'end': max(len(seq1), len(seq2)),
+                            'score': float(length_similarity),
+                            'type': 'length_similarity',
+                            'value': abs(len(seq1) - len(seq2))
+                        }
+                    }
+                }
+            }
+        except Exception as e:
+            return {
+                'start': 0,
+                'end': max(len(seq1), len(seq2)),
+                'score': 0.0,
+                'type': 'sequence_comparison_error',
+                'error': str(e)
+            }
+
+    def answer_question(self, sequence: str, question: str) -> Dict:
+        """Answer questions about protein sequence using NLP analysis"""
+        try:
+            # Analyze sequence first
+            analysis = self.analyze_sequence(sequence)
+
+            # Generate answer using NLP pipeline
+            context = f"Protein sequence analysis: {analysis['description']}"
+            answer = self.nlp_pipeline(f"Context: {context}\nQuestion: {question}")[0]['generated_text']
+
+            # Calculate answer confidence based on analysis score and question relevance
+            answer_confidence = float(analysis['score']) * 0.8  # Discount factor for answer uncertainty
+
+            return {
+                'start': 0,
+                'end': len(sequence),
+                'score': float(analysis['score']),
+                'type': 'protein_qa',
+                'response': {
+                    'start': 0,
+                    'end': len(sequence),
+                    'score': float(answer_confidence),
+                    'type': 'qa_response',
+                    'question': {
+                        'start': 0,
+                        'end': len(question),
+                        'score': 1.0,
+                        'type': 'question_text',
+                        'text': question
+                    },
+                    'answer': {
+                        'start': 0,
+                        'end': len(answer),
+                        'score': float(answer_confidence),
+                        'type': 'answer_text',
+                        'text': answer
+                    }
+                }
+            }
+        except Exception as e:
+            return {
+                'start': 0,
+                'end': len(sequence),
+                'score': 0.0,
+                'type': 'protein_qa_error',
+                'error': str(e)
+            }

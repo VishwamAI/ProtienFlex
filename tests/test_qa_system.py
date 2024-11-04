@@ -29,11 +29,16 @@ def test_answer_question(qa_system, question, context):
         answer = qa_system.answer_question(question, context)
 
         assert isinstance(answer, dict)
+        assert "start" in answer
+        assert "end" in answer
+        assert "score" in answer
+        assert "type" in answer
         assert "answer" in answer
         assert "confidence" in answer
         assert "context_used" in answer
         assert isinstance(answer["answer"], str)
         assert 0 <= answer["confidence"] <= 1
+        assert 0 <= answer["score"] <= 1
 
 @pytest.mark.parametrize("sequence,property_query", [
     ("MAEGEITTFTALTEKFNLPPGNYKKPKLLYCSNG", "binding sites"),
@@ -44,11 +49,16 @@ def test_analyze_protein_property(qa_system, sequence, property_query):
     analysis = qa_system.analyze_protein_property(sequence, property_query)
 
     assert isinstance(analysis, dict)
+    assert "start" in analysis
+    assert "end" in analysis
+    assert "score" in analysis
+    assert "type" in analysis
     assert "analysis" in analysis
     assert "confidence" in analysis
     assert "supporting_evidence" in analysis
     assert isinstance(analysis["analysis"], str)
     assert 0 <= analysis["confidence"] <= 1
+    assert 0 <= analysis["score"] <= 1
 
 @pytest.mark.parametrize("sequence1,sequence2", [
     ("MAEGEITTFTALTEKFNLPPGNYKKPKLLYCSNG", "KVFGRCELAAAMKRHGLDNYRGYSLGNWVCAAK"),
@@ -59,6 +69,10 @@ def test_compare_proteins(qa_system, sequence1, sequence2):
     comparison = qa_system.compare_proteins(sequence1, sequence2)
 
     assert isinstance(comparison, dict)
+    assert "start" in comparison
+    assert "end" in comparison
+    assert "score" in comparison
+    assert "type" in comparison
     assert "comparison" in comparison
     assert "similarities" in comparison
     assert "differences" in comparison
@@ -86,11 +100,16 @@ def test_analyze_mutation_impact(qa_system, question, sequence, mutation):
     analysis = qa_system.analyze_mutation_impact(question, sequence, mutation)
 
     assert isinstance(analysis, dict)
+    assert "start" in analysis
+    assert "end" in analysis
+    assert "score" in analysis
+    assert "type" in analysis
     assert "impact" in analysis
     assert "explanation" in analysis
     assert "confidence" in analysis
     assert "evidence" in analysis
     assert 0 <= analysis["confidence"] <= 1
+    assert 0 <= analysis["score"] <= 1
 
 @pytest.mark.parametrize("sequence,query_type", [
     ("MAEGEITTFTALTEKFNLPPGNYKKPKLLYCSNG", "structure"),

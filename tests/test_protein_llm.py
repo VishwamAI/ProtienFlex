@@ -30,11 +30,16 @@ def test_generate_protein_sequence(protein_llm, prompt, max_length):
         sequence = protein_llm.generate_protein_sequence(prompt, max_length)
 
         assert isinstance(sequence, dict)
+        assert "start" in sequence
+        assert "end" in sequence
+        assert "score" in sequence
+        assert "type" in sequence
         assert "sequence" in sequence
         assert "confidence" in sequence
         assert "properties" in sequence
         assert isinstance(sequence["sequence"], str)
         assert 0 <= sequence["confidence"] <= 1
+        assert 0 <= sequence["score"] <= 1
 
 @pytest.mark.parametrize("sequence,property_type", [
     ("MAEGEITTFTALTEKFNLPPGNYKKPKLLYCSNG", "stability"),
@@ -45,10 +50,15 @@ def test_predict_protein_properties(protein_llm, sequence, property_type):
     properties = protein_llm.predict_protein_properties(sequence, property_type)
 
     assert isinstance(properties, dict)
+    assert "start" in properties
+    assert "end" in properties
+    assert "score" in properties
+    assert "type" in properties
     assert property_type in properties
     assert "confidence" in properties
     assert "explanation" in properties
     assert 0 <= properties["confidence"] <= 1
+    assert 0 <= properties["score"] <= 1
 
 @pytest.mark.parametrize("sequence,mutation", [
     ("MAEGEITTFTALTEKFNLPPGNYKKPKLLYCSNG", "M1A"),
@@ -59,11 +69,16 @@ def test_analyze_mutation_effects(protein_llm, sequence, mutation):
     analysis = protein_llm.analyze_mutation_effects(sequence, mutation)
 
     assert isinstance(analysis, dict)
+    assert "start" in analysis
+    assert "end" in analysis
+    assert "score" in analysis
+    assert "type" in analysis
     assert "effect" in analysis
     assert "confidence" in analysis
     assert "mechanism" in analysis
     assert "stability_change" in analysis
     assert 0 <= analysis["confidence"] <= 1
+    assert 0 <= analysis["score"] <= 1
 
 @pytest.mark.parametrize("sequence", [
     "MAEGEITTFTALTEKFNLPPGNYKKPKLLYCSNG",
@@ -74,11 +89,17 @@ def test_generate_protein_description(protein_llm, sequence):
     description = protein_llm.generate_protein_description(sequence)
 
     assert isinstance(description, dict)
+    assert "start" in description
+    assert "end" in description
+    assert "score" in description
+    assert "type" in description
     assert "description" in description
     assert "features" in description
     assert "confidence" in description
     assert isinstance(description["description"], str)
     assert isinstance(description["features"], list)
+    assert 0 <= description["confidence"] <= 1
+    assert 0 <= description["score"] <= 1
 
 def test_error_handling(protein_llm):
     """Test error handling for invalid inputs."""

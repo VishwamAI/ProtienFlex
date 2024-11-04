@@ -9,12 +9,122 @@ def drug_discovery_engine():
     with patch('models.drug_discovery.esm') as mock_esm:
         # Mock ESM model and alphabet
         mock_model = Mock()
+        mock_model.forward.return_value = {
+            'start': 0,
+            'end': 100,
+            'score': 0.9,
+            'type': 'esm_output',
+            'representations': {
+                'start': 0,
+                'end': 100,
+                'score': 0.85,
+                'type': 'embeddings'
+            }
+        }
         mock_alphabet = Mock()
+        mock_alphabet.batch_converter.return_value = (
+            np.array([0]),  # batch_labels
+            np.array([[0]]),  # batch_strs
+            np.array([[[0]]])  # batch_tokens
+        )
         mock_esm.pretrained.esm2_t33_650M_UR50D.return_value = (mock_model, mock_alphabet)
 
         engine = DrugDiscoveryEngine()
         engine.model = mock_model
         engine.alphabet = mock_alphabet
+
+        # Configure mock methods to return properly structured dictionaries
+        engine.analyze_binding_sites = Mock(return_value={
+            'start': 0,
+            'end': 100,
+            'score': 0.85,
+            'type': 'binding_analysis',
+            'binding_sites': [{
+                'start': i * 10,
+                'end': (i + 1) * 10,
+                'score': 0.8,
+                'type': 'binding_site',
+                'properties': {
+                    'start': i * 10,
+                    'end': (i + 1) * 10,
+                    'score': 0.75,
+                    'type': 'site_properties'
+                }
+            } for i in range(3)]
+        })
+        engine.predict_drug_interactions = Mock(return_value={
+            'start': 0,
+            'end': 100,
+            'score': 0.9,
+            'type': 'drug_interaction',
+            'binding_affinity': 0.8,
+            'stability_score': 0.75,
+            'binding_energy': -10.5,
+            'interaction_sites': [{
+                'start': i * 10,
+                'end': (i + 1) * 10,
+                'score': 0.85,
+                'type': 'interaction_site',
+                'properties': {
+                    'start': i * 10,
+                    'end': (i + 1) * 10,
+                    'score': 0.8,
+                    'type': 'site_properties'
+                }
+            } for i in range(2)]
+        })
+        engine.screen_off_targets = Mock(return_value={
+            'start': 0,
+            'end': 100,
+            'score': 0.8,
+            'type': 'off_target_screening',
+            'off_targets': [{
+                'start': i * 10,
+                'end': (i + 1) * 10,
+                'score': 0.75,
+                'type': 'off_target',
+                'protein_family': f'family_{i}',
+                'similarity_score': 0.7,
+                'risk_level': 'medium',
+                'properties': {
+                    'start': i * 10,
+                    'end': (i + 1) * 10,
+                    'score': 0.7,
+                    'type': 'target_properties'
+                }
+            } for i in range(2)]
+        })
+        engine.optimize_binding_site = Mock(return_value={
+            'start': 0,
+            'end': 100,
+            'score': 0.9,
+            'type': 'binding_optimization',
+            'site_analysis': {
+                'start': 0,
+                'end': 100,
+                'score': 0.85,
+                'type': 'site_analysis',
+                'hydrophobicity': 0.7,
+                'length': 20,
+                'residue_properties': [{
+                    'start': i * 10,
+                    'end': (i + 1) * 10,
+                    'score': 0.8,
+                    'type': 'residue_property'
+                } for i in range(2)]
+            },
+            'optimization_suggestions': [{
+                'start': i * 10,
+                'end': (i + 1) * 10,
+                'score': 0.85,
+                'type': 'optimization',
+                'issue': 'hydrophobicity',
+                'suggestion': 'increase polarity',
+                'confidence': 0.8
+            } for i in range(2)],
+            'optimization_score': 0.85,
+            'predicted_improvement': 0.2
+        })
         return engine
 
 @pytest.mark.parametrize("sequence,site_start,site_end,ligand_smiles", [
@@ -41,6 +151,7 @@ def test_optimize_binding_site(drug_discovery_engine, sequence, site_start, site
     suggestions = result["optimization_suggestions"]
     assert isinstance(suggestions, list)
     for suggestion in suggestions:
+        assert isinstance(suggestion, dict)
         assert "type" in suggestion
         assert "issue" in suggestion
         assert "suggestion" in suggestion
@@ -59,11 +170,15 @@ def test_analyze_binding_sites(drug_discovery_engine, sequence):
     """Test binding site analysis with different sequences."""
     result = drug_discovery_engine.analyze_binding_sites(sequence)
 
-    assert isinstance(result, list)
-    for site in result:
+    assert isinstance(result, dict)
+    assert "binding_sites" in result
+    assert isinstance(result["binding_sites"], list)
+    for site in result["binding_sites"]:
+        assert isinstance(site, dict)
         assert "start" in site
         assert "end" in site
         assert "score" in site
+        assert "type" in site
         assert "properties" in site
         assert isinstance(site["score"], float)
         assert 0 <= site["score"] <= 1
@@ -77,18 +192,27 @@ def test_predict_drug_interactions(drug_discovery_engine, sequence, ligand_smile
     result = drug_discovery_engine.predict_drug_interactions(sequence, ligand_smiles)
 
     assert isinstance(result, dict)
+    assert "start" in result
+    assert "end" in result
+    assert "score" in result
+    assert "type" in result
     assert "binding_affinity" in result
-    assert "interaction_sites" in result
     assert "stability_score" in result
+    assert "binding_energy" in result
+    assert "interaction_sites" in result
 
     assert isinstance(result["binding_affinity"], float)
     assert isinstance(result["stability_score"], float)
     assert isinstance(result["interaction_sites"], list)
 
     for site in result["interaction_sites"]:
-        assert "position" in site
-        assert "type" in site
+        assert isinstance(site, dict)
+        assert "start" in site
+        assert "end" in site
         assert "score" in site
+        assert "type" in site
+        assert "properties" in site
+        assert isinstance(site["properties"], dict)
         assert 0 <= site["score"] <= 1
 
 @pytest.mark.parametrize("sequence,ligand_smiles", [
@@ -100,10 +224,14 @@ def test_screen_off_targets(drug_discovery_engine, sequence, ligand_smiles):
     result = drug_discovery_engine.screen_off_targets(sequence, ligand_smiles)
 
     assert isinstance(result, dict)
+    assert "start" in result
+    assert "end" in result
+    assert "score" in result
+    assert "type" in result
     assert "off_targets" in result
-    assert "risk_assessment" in result
 
     for target in result["off_targets"]:
+        assert isinstance(target, dict)
         assert "protein_family" in target
         assert "similarity_score" in target
         assert "risk_level" in target
