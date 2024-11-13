@@ -34,7 +34,8 @@ class MolecularDynamics:
         simulation.step(equil_steps)
         state = simulation.context.getState(getEnergy=True)
         ke = state.getKineticEnergy()
-        temp = ke / (0.5 * 0.0083144621 * len(simulation.topology.atoms()) * unit.kilojoules_per_mole)
+        n_atoms = sum(1 for _ in simulation.topology.atoms())  # Convert generator to count
+        temp = ke / (0.5 * 0.0083144621 * n_atoms * unit.kilojoules_per_mole)
         return {
             'potential_energy': state.getPotentialEnergy(),
             'kinetic_energy': ke,
@@ -46,7 +47,8 @@ class MolecularDynamics:
         simulation.step(steps)
         state = simulation.context.getState(getEnergy=True, getPositions=True)
         ke = state.getKineticEnergy()
-        temp = ke / (0.5 * 0.0083144621 * len(simulation.topology.atoms()) * unit.kilojoules_per_mole)
+        n_atoms = sum(1 for _ in simulation.topology.atoms())  # Convert generator to count
+        temp = ke / (0.5 * 0.0083144621 * n_atoms * unit.kilojoules_per_mole)
         return {
             'potential_energy': state.getPotentialEnergy(),
             'kinetic_energy': ke,
