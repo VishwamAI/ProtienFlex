@@ -1,4 +1,4 @@
-from openmm import app, unit, LangevinMiddleIntegrator, Platform
+from openmm import app, unit, Platform, LangevinMiddleIntegrator
 import numpy as np
 import logging
 
@@ -160,7 +160,7 @@ class EnhancedSampling:
 
     def _create_integrator(self, temperature):
         """Create Langevin integrator for replica exchange"""
-        return app.LangevinMiddleIntegrator(
+        return LangevinMiddleIntegrator(
             temperature,
             1.0/unit.picosecond,
             0.002*unit.picoseconds
