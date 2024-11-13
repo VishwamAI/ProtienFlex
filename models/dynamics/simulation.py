@@ -337,3 +337,111 @@ class MolecularDynamics:
         except Exception as e:
             logger.error(f"Error analyzing trajectory: {e}")
             raise
+
+class EnhancedSampling(MolecularDynamics):
+    """Enhanced sampling methods for molecular dynamics simulations"""
+    def __init__(self, device: Optional[str] = None, n_replicas: int = 4):
+        """Initialize enhanced sampling simulation"""
+        super().__init__(device)
+        self.n_replicas = n_replicas
+        self.replicas = []
+        self.temperatures = None
+        self._setup_replicas()
+
+    def _setup_replicas(self) -> bool:
+        """Initialize replica exchange simulation setup"""
+        try:
+            # Set up temperature ladder
+            min_temp = 300.0
+            max_temp = 400.0
+            self.temperatures = np.exp(np.linspace(
+                np.log(min_temp),
+                np.log(max_temp),
+                self.n_replicas
+            ))
+
+            # Initialize replicas
+            for temp in self.temperatures:
+                replica = {
+                    'temperature': temp,
+                    'simulation': None,
+                    'state': None
+                }
+                self.replicas.append(replica)
+
+            return True
+        except Exception as e:
+            logger.error(f"Error setting up replicas: {e}")
+            return False
+
+    def setup_replica_simulations(self, pdb_file: str, forcefield: str = 'amber14-all.xml') -> bool:
+        """Set up OpenMM systems for all replicas"""
+        try:
+            for i, replica in enumerate(self.replicas):
+                # Setup simulation for each replica
+                simulation, modeller = self.setup_simulation(pdb_file, forcefield)
+
+                # Update integrator temperature
+                integrator = simulation.context.getIntegrator()
+                integrator.setTemperature(replica['temperature'] * unit.kelvin)
+
+                replica['simulation'] = simulation
+                replica['state'] = modeller
+
+            return True
+        except Exception as e:
+            logger.error(f"Error setting up replica simulations: {e}")
+            return False
+
+    def run_replica_exchange(self, n_steps: int, exchange_interval: int = 1000) -> Dict:
+        """Run replica exchange molecular dynamics"""
+        try:
+            exchange_stats = {'accepted': 0, 'total': 0}
+
+            for step in range(n_steps):
+                # Run dynamics for all replicas
+                for replica in self.replicas:
+                    replica['simulation'].step(1)
+
+                # Attempt exchanges at specified interval
+                if step % exchange_interval == 0:
+                    self._attempt_exchanges(exchange_stats)
+
+            return {
+                'exchange_stats': exchange_stats,
+                'final_temperatures': [r['temperature'] for r in self.replicas],
+                'potential_energies': [r['simulation'].context.getState(getEnergy=True).getPotentialEnergy().value_in_unit(unit.kilojoules_per_mole)
+                                     for r in self.replicas]
+            }
+
+        except Exception as e:
+            logger.error(f"Error during replica exchange: {e}")
+            raise
+
+    def _attempt_exchanges(self, stats: Dict) -> None:
+        """Attempt exchanges between neighboring replicas"""
+        try:
+            for i in range(self.n_replicas - 1):
+                # Calculate exchange probability
+                beta_i = 1.0 / (0.0083144621 * self.replicas[i]['temperature'])
+                beta_j = 1.0 / (0.0083144621 * self.replicas[i+1]['temperature'])
+
+                energy_i = self.replicas[i]['simulation'].context.getState(getEnergy=True).getPotentialEnergy()
+                energy_j = self.replicas[i+1]['simulation'].context.getState(getEnergy=True).getPotentialEnergy()
+
+                delta = (beta_i - beta_j) * (energy_i - energy_j)
+
+                stats['total'] += 1
+                if delta < 0 or np.random.random() < np.exp(-delta):
+                    # Exchange coordinates
+                    state_i = self.replicas[i]['simulation'].context.getState(getPositions=True)
+                    state_j = self.replicas[i+1]['simulation'].context.getState(getPositions=True)
+
+                    self.replicas[i]['simulation'].context.setPositions(state_j.getPositions())
+                    self.replicas[i+1]['simulation'].context.setPositions(state_i.getPositions())
+
+                    stats['accepted'] += 1
+
+        except Exception as e:
+            logger.error(f"Error during exchange attempt: {e}")
+            raise
