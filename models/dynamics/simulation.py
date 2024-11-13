@@ -337,3 +337,126 @@ class MolecularDynamics:
         except Exception as e:
             logger.error(f"Error analyzing trajectory: {e}")
             raise
+
+class EnhancedSampling(MolecularDynamics):
+    """Enhanced sampling methods for molecular dynamics simulations"""
+
+    def __init__(self, device: Optional[str] = None):
+        """Initialize enhanced sampling with device detection"""
+        super().__init__(device)
+        self.replicas = []
+        self.umbrella_windows = []
+
+    def setup_replica_exchange(self, pdb_file: str, n_replicas: int = 4,
+                             temp_range: Tuple[float, float] = (300.0, 400.0)) -> List[app.Simulation]:
+        """Setup replica exchange molecular dynamics (REMD)"""
+        try:
+            # Create replicas at different temperatures
+            temperatures = np.linspace(temp_range[0], temp_range[1], n_replicas)
+            self.replicas = []
+
+            for temp in temperatures:
+                # Setup base simulation
+                sim, modeller = self.setup_simulation(pdb_file)
+
+                # Modify integrator temperature
+                integrator = mm.LangevinMiddleIntegrator(
+                    temp*unit.kelvin,
+                    1.0/unit.picosecond,
+                    0.002*unit.picoseconds
+                )
+                integrator.setConstraintTolerance(1e-5)
+
+                # Create new simulation with modified temperature
+                replica = app.Simulation(
+                    sim.topology,
+                    sim.system,
+                    integrator,
+                    self.platform,
+                    self.properties
+                )
+
+                # Set positions and velocities
+                replica.context.setPositions(sim.context.getState(getPositions=True).getPositions())
+                replica.context.setVelocitiesToTemperature(temp*unit.kelvin)
+
+                self.replicas.append(replica)
+
+            return self.replicas
+
+        except Exception as e:
+            logger.error(f"Error setting up replica exchange: {e}")
+            raise
+
+    def run_replica_exchange(self, exchange_steps: int = 1000,
+                           dynamics_steps: int = 1000) -> List[Dict]:
+        """Run replica exchange molecular dynamics"""
+        try:
+            if not self.replicas:
+                raise ValueError("No replicas found. Run setup_replica_exchange first.")
+
+            results = []
+
+            # Run dynamics and exchanges
+            for _ in range(exchange_steps):
+                # Run dynamics for each replica
+                for replica in self.replicas:
+                    replica.step(dynamics_steps)
+
+                # Attempt exchanges between neighboring replicas
+                for i in range(len(self.replicas)-1):
+                    success = self._attempt_exchange(self.replicas[i], self.replicas[i+1])
+                    if success:
+                        logger.info(f"Exchange successful between replicas {i} and {i+1}")
+
+                # Collect state information
+                states = []
+                for replica in self.replicas:
+                    state = replica.context.getState(getEnergy=True)
+                    states.append({
+                        'potential_energy': state.getPotentialEnergy().value_in_unit(unit.kilojoules_per_mole),
+                        'kinetic_energy': state.getKineticEnergy().value_in_unit(unit.kilojoules_per_mole),
+                        'temperature': state.getKineticEnergy() / (0.5 * unit.MOLAR_GAS_CONSTANT_R *
+                                     len(list(replica.topology.atoms())))
+                    })
+                results.append(states)
+
+            return results
+
+        except Exception as e:
+            logger.error(f"Error running replica exchange: {e}")
+            raise
+
+    def _attempt_exchange(self, replica1: app.Simulation,
+                         replica2: app.Simulation) -> bool:
+        """Attempt a replica exchange between two simulations"""
+        try:
+            # Get states and energies
+            state1 = replica1.context.getState(getEnergy=True, getPositions=True)
+            state2 = replica2.context.getState(getEnergy=True, getPositions=True)
+
+            energy1 = state1.getPotentialEnergy()
+            energy2 = state2.getPotentialEnergy()
+
+            # Get temperatures
+            temp1 = replica1.integrator.getTemperature()
+            temp2 = replica2.integrator.getTemperature()
+
+            # Calculate Metropolis criterion
+            delta = (1/temp1 - 1/temp2) * (energy1 - energy2)
+            delta = delta.value_in_unit(unit.kilojoules_per_mole/unit.kelvin)
+
+            # Accept or reject exchange
+            if delta < 0 or np.random.random() < np.exp(-delta):
+                # Exchange positions
+                pos1 = state1.getPositions()
+                pos2 = state2.getPositions()
+                replica1.context.setPositions(pos2)
+                replica2.context.setPositions(pos1)
+                return True
+
+            return False
+
+        except Exception as e:
+            logger.error(f"Error attempting replica exchange: {e}")
+            raise
