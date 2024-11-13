@@ -1,6 +1,27 @@
 from openmm import app, unit
 import numpy as np
 
+class MolecularDynamics:
+    def __init__(self):
+        self.simulation = None
+
+    def setup_simulation(self, pdb_file):
+        pdb = app.PDBFile(pdb_file)
+        force_field = app.ForceField('amber14-all.xml')
+        system = force_field.createSystem(
+            pdb.topology,
+            nonbondedMethod=app.NoCutoff,
+            constraints=app.HBonds
+        )
+        integrator = app.LangevinMiddleIntegrator(
+            300*unit.kelvin,
+            1.0/unit.picosecond,
+            0.002*unit.picoseconds
+        )
+        self.simulation = app.Simulation(pdb.topology, system, integrator)
+        self.simulation.context.setPositions(pdb.positions)
+        return self.simulation
+
 class EnhancedSampling:
     def __init__(self):
         self.replicas = []
@@ -13,7 +34,7 @@ class EnhancedSampling:
         beta_min = 1.0 / (0.0083144621 * max_temp)
         beta_max = 1.0 / (0.0083144621 * min_temp)
         betas = np.exp(np.linspace(np.log(beta_min), np.log(beta_max), n_replicas))
-        self.temperatures = [1.0 / (0.0083144621 * beta) * unit.kelvin for beta in betas]
+        self.temperatures = [1.0 / (0.0083144621 * beta) * unit.kelvin for beta in reversed(betas)]
 
         # Create replicas
         self.replicas = []
