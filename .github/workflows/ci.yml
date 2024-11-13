@@ -53,11 +53,11 @@ jobs:
 
       - name: Run tests
         run: |
-          cd tests
-          python -m pytest \
-            test_dynamics.py \
-            test_mutation_analysis.py \
-            -v --cov=../models
+          # Run tests from project root with proper Python path
+          PYTHONPATH=$PYTHONPATH:$(pwd) python -m pytest \
+            tests/test_dynamics.py \
+            tests/test_mutation_analysis.py \
+            -v --cov=models
 
       - name: Check code style
         run: |
