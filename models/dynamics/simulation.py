@@ -356,10 +356,20 @@ class EnhancedSampling(MolecularDynamics):
         ]
         logger.info(f"Temperature ladder: {self.temperatures}")
 
-    def setup_replica_simulations(self, pdb_file: str, n_replicas: int = 4) -> List[app.Simulation]:
-        """Setup multiple replica simulations at different temperatures"""
+    def setup_replica_exchange(self, pdb_file: str, n_replicas: int = 4, temp_range: Tuple[float, float] = (300.0, 400.0)) -> List[app.Simulation]:
+        """Setup replica exchange simulations
+
+        Args:
+            pdb_file: Path to PDB file
+            n_replicas: Number of replicas
+            temp_range: Temperature range (min_temp, max_temp)
+
+        Returns:
+            List of replica simulations
+        """
         try:
-            self._setup_replicas(n_replicas)
+            min_temp, max_temp = temp_range
+            self._setup_replicas(n_replicas, min_temp, max_temp)
             self.replicas = []
 
             for temp in self.temperatures:
@@ -370,14 +380,14 @@ class EnhancedSampling(MolecularDynamics):
             return self.replicas
 
         except Exception as e:
-            logger.error(f"Error setting up replica simulations: {e}")
+            logger.error(f"Error setting up replica exchange: {e}")
             raise
 
     def run_replica_exchange(self, n_steps: int = 1000, exchange_interval: int = 100):
         """Run replica exchange molecular dynamics"""
         try:
             if not self.replicas:
-                raise ValueError("No replicas set up. Call setup_replica_simulations first.")
+                raise ValueError("No replicas set up. Call setup_replica_exchange first.")
 
             for step in range(n_steps):
                 # Run dynamics for all replicas
