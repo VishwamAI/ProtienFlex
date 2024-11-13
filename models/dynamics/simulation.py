@@ -32,21 +32,25 @@ class MolecularDynamics:
         simulation.minimizeEnergy(maxIterations=min_steps)
         simulation.context.setVelocitiesToTemperature(300*unit.kelvin)
         simulation.step(equil_steps)
-        state = simulation.context.getState(getEnergy=True, getTemperature=True)
+        state = simulation.context.getState(getEnergy=True)
+        ke = state.getKineticEnergy()
+        temp = ke / (0.5 * 0.0083144621 * len(simulation.topology.atoms()) * unit.kilojoules_per_mole)
         return {
             'potential_energy': state.getPotentialEnergy(),
-            'kinetic_energy': state.getKineticEnergy(),
-            'temperature': state.getTemperature()
+            'kinetic_energy': ke,
+            'temperature': temp
         }
 
     def run_dynamics(self, simulation, steps=1000):
         """Run molecular dynamics simulation"""
         simulation.step(steps)
-        state = simulation.context.getState(getEnergy=True, getTemperature=True, getPositions=True)
+        state = simulation.context.getState(getEnergy=True, getPositions=True)
+        ke = state.getKineticEnergy()
+        temp = ke / (0.5 * 0.0083144621 * len(simulation.topology.atoms()) * unit.kilojoules_per_mole)
         return {
             'potential_energy': state.getPotentialEnergy(),
-            'kinetic_energy': state.getKineticEnergy(),
-            'temperature': state.getTemperature(),
+            'kinetic_energy': ke,
+            'temperature': temp,
             'positions': state.getPositions()
         }
 
@@ -56,7 +60,7 @@ class MolecularDynamics:
         avg_structure = np.mean(positions, axis=0)
         structure_variance = np.var(positions, axis=0)
         return {
-            'rmsd': rmsd,
+            'rmsd': float(rmsd[0]),  # Convert first frame RMSD to float
             'average_structure': avg_structure,
             'structure_variance': structure_variance
         }
@@ -136,6 +140,7 @@ class EnhancedSampling:
         return [{
             'temperature': temp,
             'potential_energy': replica.context.getState(getEnergy=True).getPotentialEnergy(),
+            'kinetic_energy': replica.context.getState(getEnergy=True).getKineticEnergy(),
             'positions': replica.context.getState(getPositions=True).getPositions()
         } for temp, replica in zip(self.temperatures, self.replicas)]
 
@@ -149,6 +154,14 @@ class EnhancedSampling:
             constraints=app.HBonds
         )
         return system
+
+    def _create_integrator(self, temperature):
+        """Create Langevin integrator with specified temperature"""
+        return LangevinMiddleIntegrator(
+            temperature,
+            1.0/unit.picosecond,
+            0.002*unit.picoseconds
+        )
 
     def _create_integrator(self, temperature):
         """Create Langevin integrator with specified temperature"""

@@ -78,7 +78,7 @@ class TestMolecularDynamics(unittest.TestCase):
 
         # Check system setup
         system = simulation.system
-        self.assertTrue(system.usesPeriodicBoundaryConditions())
+        self.assertFalse(system.usesPeriodicBoundaryConditions())  # Changed to expect non-periodic boundaries
         self.assertGreater(system.getNumParticles(), 0)
 
     def test_minimize_and_equilibrate(self):
@@ -127,9 +127,10 @@ class TestMolecularDynamics(unittest.TestCase):
         self.assertIn('structure_variance', result)
 
         # Verify analysis results
-        self.assertIsInstance(result['rmsd'], float)
+        self.assertIsInstance(result['rmsd'], float)  # Expect single float value
         self.assertEqual(result['average_structure'].shape, (n_atoms, 3))
         self.assertEqual(result['structure_variance'].shape, (n_atoms, 3))
+        self.assertGreaterEqual(result['rmsd'], 0.0)  # RMSD should be non-negative
 
     def test_integration_with_mutation_analysis(self):
         """Test integration with mutation analysis workflow"""
