@@ -354,6 +354,11 @@ class EnhancedSampling(MolecularDynamics):
         if min_temp >= max_temp:
             raise ValueError("max_temp must be greater than min_temp")
 
+        # Convert temperatures to OpenMM units
+        min_temp = min_temp * unit.kelvin
+        max_temp = max_temp * unit.kelvin
+
+        # Generate temperature ladder
         self.temperatures = [
             min_temp * (max_temp/min_temp)**(i/(n_replicas-1))
             for i in range(n_replicas)
@@ -381,7 +386,7 @@ class EnhancedSampling(MolecularDynamics):
 
             for temp in self.temperatures:
                 sim, _ = self.setup_simulation(pdb_file)
-                sim.context.setVelocitiesToTemperature(temp * unit.kelvin)
+                sim.context.setVelocitiesToTemperature(temp)
                 self.replicas.append(sim)
 
             return self.replicas
@@ -446,12 +451,12 @@ class EnhancedSampling(MolecularDynamics):
                 state_i = self.replicas[i].context.getState(getEnergy=True)
                 state_j = self.replicas[i+1].context.getState(getEnergy=True)
 
-                energy_i = state_i.getPotentialEnergy()
-                energy_j = state_j.getPotentialEnergy()
+                energy_i = state_i.getPotentialEnergy()._value
+                energy_j = state_j.getPotentialEnergy()._value
 
-                # Calculate exchange probability
-                beta_i = 1.0 / (0.0083144621 * self.temperatures[i])
-                beta_j = 1.0 / (0.0083144621 * self.temperatures[i+1])
+                # Calculate exchange probability using temperature values in Kelvin
+                beta_i = 1.0 / (0.0083144621 * self.temperatures[i]._value)
+                beta_j = 1.0 / (0.0083144621 * self.temperatures[i+1]._value)
 
                 delta = (beta_i - beta_j) * (energy_j - energy_i)
 
@@ -463,12 +468,8 @@ class EnhancedSampling(MolecularDynamics):
                     )
 
                     # Update velocities for new temperatures
-                    self.replicas[i].context.setVelocitiesToTemperature(
-                        self.temperatures[i] * unit.kelvin
-                    )
-                    self.replicas[i+1].context.setVelocitiesToTemperature(
-                        self.temperatures[i+1] * unit.kelvin
-                    )
+                    self.replicas[i].context.setVelocitiesToTemperature(self.temperatures[i])
+                    self.replicas[i+1].context.setVelocitiesToTemperature(self.temperatures[i+1])
 
         except Exception as e:
             logger.error(f"Error during exchange attempt: {e}")
