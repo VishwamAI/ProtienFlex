@@ -1,9 +1,10 @@
-from openmm import app, unit
+from openmm import app, unit, LangevinMiddleIntegrator
 import numpy as np
 
 class MolecularDynamics:
-    def __init__(self):
+    def __init__(self, device='cpu'):
         self.simulation = None
+        self.device = device
 
     def setup_simulation(self, pdb_file):
         pdb = app.PDBFile(pdb_file)
@@ -13,14 +14,22 @@ class MolecularDynamics:
             nonbondedMethod=app.NoCutoff,
             constraints=app.HBonds
         )
-        integrator = app.LangevinMiddleIntegrator(
+        integrator = LangevinMiddleIntegrator(
             300*unit.kelvin,
             1.0/unit.picosecond,
             0.002*unit.picoseconds
         )
         self.simulation = app.Simulation(pdb.topology, system, integrator)
         self.simulation.context.setPositions(pdb.positions)
-        return self.simulation
+        return self.simulation, pdb
+
+    def analyze_trajectory(self, positions):
+        """Analyze trajectory data"""
+        rmsd = np.sqrt(np.mean(np.sum((positions - positions[0])**2, axis=2), axis=1))
+        return {
+            'rmsd': rmsd,
+            'avg_structure': np.mean(positions, axis=0)
+        }
 
 class EnhancedSampling:
     def __init__(self):
@@ -58,7 +67,7 @@ class EnhancedSampling:
         return system
 
     def _create_integrator(self, temperature):
-        return app.LangevinMiddleIntegrator(
+        return LangevinMiddleIntegrator(
             temperature,
             1.0/unit.picosecond,
             0.002*unit.picoseconds
