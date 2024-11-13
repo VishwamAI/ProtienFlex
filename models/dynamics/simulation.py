@@ -14,7 +14,7 @@ class MolecularDynamics:
         force_field = app.ForceField('amber14-all.xml')
         system = force_field.createSystem(
             modeller.topology,
-            nonbondedMethod=app.PME,
+            nonbondedMethod=app.CutoffNonPeriodic,
             nonbondedCutoff=1.0*unit.nanometers,
             constraints=app.HBonds
         )
@@ -144,7 +144,7 @@ class EnhancedSampling:
         force_field = app.ForceField('amber14-all.xml')
         system = force_field.createSystem(
             topology,
-            nonbondedMethod=app.PME,
+            nonbondedMethod=app.CutoffNonPeriodic,
             nonbondedCutoff=1.0*unit.nanometers,
             constraints=app.HBonds
         )
