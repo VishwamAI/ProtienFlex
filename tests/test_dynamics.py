@@ -16,8 +16,8 @@ class TestMolecularDynamics(unittest.TestCase):
 
         # Set up paths
         cls.test_dir = Path(__file__).parent
-        cls.test_pdb = cls.test_dir / "test_protein.pdb"
-        cls.alanine_pdb = cls.test_dir / "alanine-dipeptide.pdb"
+        cls.test_pdb = cls.test_dir / "data" / "test_protein.pdb"
+        cls.alanine_pdb = cls.test_dir / "data" / "alanine-dipeptide.pdb"
         cls._create_test_pdb()
 
     @classmethod
