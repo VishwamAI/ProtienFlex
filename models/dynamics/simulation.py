@@ -350,6 +350,10 @@ class EnhancedSampling(MolecularDynamics):
     def _setup_replicas(self, n_replicas: int, min_temp: float = 300.0, max_temp: float = 400.0):
         """Setup replica temperature ladder"""
         # Generate temperature ladder using geometric progression
+        # Ensure min_temp and max_temp are different
+        if min_temp >= max_temp:
+            raise ValueError("max_temp must be greater than min_temp")
+
         self.temperatures = [
             min_temp * (max_temp/min_temp)**(i/(n_replicas-1))
             for i in range(n_replicas)
@@ -369,6 +373,9 @@ class EnhancedSampling(MolecularDynamics):
         """
         try:
             min_temp, max_temp = temp_range
+            if min_temp >= max_temp:
+                raise ValueError("max_temp must be greater than min_temp")
+
             self._setup_replicas(n_replicas, min_temp, max_temp)
             self.replicas = []
 
@@ -383,20 +390,49 @@ class EnhancedSampling(MolecularDynamics):
             logger.error(f"Error setting up replica exchange: {e}")
             raise
 
-    def run_replica_exchange(self, n_steps: int = 1000, exchange_interval: int = 100):
-        """Run replica exchange molecular dynamics"""
+    def run_replica_exchange(self, n_steps: int = 1000, exchange_interval: int = 100,
+                           exchange_steps: Optional[int] = None, dynamics_steps: Optional[int] = None) -> List[Dict]:
+        """Run replica exchange molecular dynamics
+
+        Args:
+            n_steps: Total number of simulation steps
+            exchange_interval: Steps between exchange attempts
+            exchange_steps: Number of exchange attempts to perform
+            dynamics_steps: Number of dynamics steps between exchanges
+
+        Returns:
+            List of replica states at each exchange step
+        """
         try:
             if not self.replicas:
                 raise ValueError("No replicas set up. Call setup_replica_exchange first.")
 
-            for step in range(n_steps):
+            # Use dynamics_steps if provided, otherwise use exchange_interval
+            interval = dynamics_steps if dynamics_steps is not None else exchange_interval
+            # Use exchange_steps if provided, otherwise calculate from n_steps and interval
+            total_exchanges = exchange_steps if exchange_steps is not None else n_steps // interval
+
+            results = []
+            for step in range(total_exchanges):
                 # Run dynamics for all replicas
                 for i, sim in enumerate(self.replicas):
-                    sim.step(exchange_interval)
+                    sim.step(interval)
 
                 # Attempt exchanges between neighboring replicas
-                if (step + 1) % exchange_interval == 0:
-                    self._attempt_exchanges()
+                self._attempt_exchanges()
+
+                # Record states
+                states = []
+                for replica in self.replicas:
+                    state = replica.context.getState(getEnergy=True)
+                    states.append({
+                        'potential_energy': state.getPotentialEnergy(),
+                        'kinetic_energy': state.getKineticEnergy(),
+                        'temperature': replica.integrator.getTemperature()
+                    })
+                results.append(states)
+
+            return results
 
         except Exception as e:
             logger.error(f"Error during replica exchange: {e}")
