@@ -33,11 +33,11 @@ class MolecularDynamics:
         simulation.context.setVelocitiesToTemperature(300*unit.kelvin)
         simulation.step(equil_steps)
         state = simulation.context.getState(getEnergy=True)
-        ke = state.getKineticEnergy()
+        ke = state.getKineticEnergy()._value
         n_atoms = sum(1 for _ in simulation.topology.atoms())  # Convert generator to count
-        temp = ke / (0.5 * 0.0083144621 * n_atoms * unit.kilojoules_per_mole)
+        temp = ke / (0.5 * 0.0083144621 * n_atoms)  # Already in kJ/mol
         return {
-            'potential_energy': state.getPotentialEnergy(),
+            'potential_energy': state.getPotentialEnergy()._value,
             'kinetic_energy': ke,
             'temperature': temp
         }
@@ -46,14 +46,15 @@ class MolecularDynamics:
         """Run molecular dynamics simulation"""
         simulation.step(steps)
         state = simulation.context.getState(getEnergy=True, getPositions=True)
-        ke = state.getKineticEnergy()
+        ke = state.getKineticEnergy()._value
         n_atoms = sum(1 for _ in simulation.topology.atoms())  # Convert generator to count
-        temp = ke / (0.5 * 0.0083144621 * n_atoms * unit.kilojoules_per_mole)
+        temp = ke / (0.5 * 0.0083144621 * n_atoms)  # Already in kJ/mol
+        positions = state.getPositions(asNumpy=True)._value  # Convert to numpy array
         return {
-            'potential_energy': state.getPotentialEnergy(),
+            'potential_energy': state.getPotentialEnergy()._value,
             'kinetic_energy': ke,
             'temperature': temp,
-            'positions': state.getPositions()
+            'positions': positions
         }
 
     def analyze_trajectory(self, positions):
@@ -158,16 +159,8 @@ class EnhancedSampling:
         return system
 
     def _create_integrator(self, temperature):
-        """Create Langevin integrator with specified temperature"""
-        return LangevinMiddleIntegrator(
-            temperature,
-            1.0/unit.picosecond,
-            0.002*unit.picoseconds
-        )
-
-    def _create_integrator(self, temperature):
-        """Create Langevin integrator with specified temperature"""
-        return LangevinMiddleIntegrator(
+        """Create Langevin integrator for replica exchange"""
+        return app.LangevinMiddleIntegrator(
             temperature,
             1.0/unit.picosecond,
             0.002*unit.picoseconds
