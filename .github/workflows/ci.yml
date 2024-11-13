@@ -44,8 +44,12 @@ jobs:
           pip install setuptools wheel Cython==0.29.36
           # Install mdtraj dependencies
           pip install numpy==1.23.5 scipy==1.9.3
-          # Install mdtraj from binary
-          pip install --only-binary :all: mdtraj==1.10.0
+          # Install mdtraj with specific flags to avoid GIL issues
+          pip install --no-cache-dir --no-deps mdtraj==1.9.7
+          # Install OpenMM first (mdtraj dependency)
+          pip install openmm==8.0.0
+          # Now install remaining mdtraj dependencies
+          pip install pandas networkx joblib
           # Install remaining requirements
           pip install -r requirements.txt
           # Install package in development mode
