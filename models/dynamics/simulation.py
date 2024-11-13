@@ -14,7 +14,8 @@ class MolecularDynamics:
         force_field = app.ForceField('amber14-all.xml')
         system = force_field.createSystem(
             modeller.topology,
-            nonbondedMethod=app.NoCutoff,
+            nonbondedMethod=app.PME,
+            nonbondedCutoff=1.0*unit.nanometers,
             constraints=app.HBonds
         )
         integrator = LangevinMiddleIntegrator(
@@ -31,17 +32,33 @@ class MolecularDynamics:
         simulation.minimizeEnergy(maxIterations=min_steps)
         simulation.context.setVelocitiesToTemperature(300*unit.kelvin)
         simulation.step(equil_steps)
+        state = simulation.context.getState(getEnergy=True, getTemperature=True)
         return {
-            'potential_energy': simulation.context.getState(getEnergy=True).getPotentialEnergy(),
-            'kinetic_energy': simulation.context.getState(getEnergy=True).getKineticEnergy()
+            'potential_energy': state.getPotentialEnergy(),
+            'kinetic_energy': state.getKineticEnergy(),
+            'temperature': state.getTemperature()
+        }
+
+    def run_dynamics(self, simulation, steps=1000):
+        """Run molecular dynamics simulation"""
+        simulation.step(steps)
+        state = simulation.context.getState(getEnergy=True, getTemperature=True, getPositions=True)
+        return {
+            'potential_energy': state.getPotentialEnergy(),
+            'kinetic_energy': state.getKineticEnergy(),
+            'temperature': state.getTemperature(),
+            'positions': state.getPositions()
         }
 
     def analyze_trajectory(self, positions):
         """Analyze trajectory data"""
         rmsd = np.sqrt(np.mean(np.sum((positions - positions[0])**2, axis=2), axis=1))
+        avg_structure = np.mean(positions, axis=0)
+        structure_variance = np.var(positions, axis=0)
         return {
             'rmsd': rmsd,
-            'average_structure': np.mean(positions, axis=0)
+            'average_structure': avg_structure,
+            'structure_variance': structure_variance
         }
 
 class EnhancedSampling:
@@ -50,6 +67,7 @@ class EnhancedSampling:
         self.temperatures = []
 
     def setup_replica_exchange(self, pdb_file, n_replicas=4, temp_range=(300.0, 400.0)):
+        """Setup replica exchange simulation"""
         min_temp, max_temp = temp_range
 
         # Generate temperature ladder using geometric progression
@@ -92,15 +110,15 @@ class EnhancedSampling:
 
     def _attempt_exchange(self, i, j):
         """Attempt exchange between replicas i and j"""
-        energy_i = self.replicas[i].context.getState(getEnergy=True).getPotentialEnergy()
-        energy_j = self.replicas[j].context.getState(getEnergy=True).getPotentialEnergy()
+        energy_i = self.replicas[i].context.getState(getEnergy=True).getPotentialEnergy()._value
+        energy_j = self.replicas[j].context.getState(getEnergy=True).getPotentialEnergy()._value
 
         beta_i = 1.0 / (0.0083144621 * self.temperatures[i].value_in_unit(unit.kelvin))
         beta_j = 1.0 / (0.0083144621 * self.temperatures[j].value_in_unit(unit.kelvin))
 
-        delta = (beta_i - beta_j) * (energy_i - energy_j)
+        delta = float((beta_i - beta_j) * (energy_i - energy_j))
 
-        if delta <= 0 or np.random.random() < np.exp(-delta):
+        if delta <= 0.0 or np.random.random() < np.exp(-delta):
             self._swap_replicas(i, j)
             return True
         return False
@@ -122,15 +140,18 @@ class EnhancedSampling:
         } for temp, replica in zip(self.temperatures, self.replicas)]
 
     def _create_system(self, topology):
+        """Create OpenMM system with force field"""
         force_field = app.ForceField('amber14-all.xml')
         system = force_field.createSystem(
             topology,
-            nonbondedMethod=app.NoCutoff,
+            nonbondedMethod=app.PME,
+            nonbondedCutoff=1.0*unit.nanometers,
             constraints=app.HBonds
         )
         return system
 
     def _create_integrator(self, temperature):
+        """Create Langevin integrator with specified temperature"""
         return LangevinMiddleIntegrator(
             temperature,
             1.0/unit.picosecond,
