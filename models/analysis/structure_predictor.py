@@ -18,20 +18,20 @@ class StructurePredictor(nn.Module):
 
         hidden_size = config.get('hidden_size', 320)  # Match ESM2 dimensions
 
-        # Initialize backbone prediction network
+        # Initialize backbone prediction network with correct dimensions
         self.backbone_network = nn.Sequential(
-            nn.Linear(hidden_size, hidden_size),
+            nn.Linear(320, 320),  # Fixed input/output dimensions
             nn.ReLU(),
             nn.Dropout(0.1),
-            nn.Linear(hidden_size, hidden_size)
+            nn.Linear(320, 320)  # Fixed input/output dimensions
         )
 
-        # Initialize side chain optimization network
+        # Initialize side chain optimization network with correct dimensions
         self.side_chain_network = nn.Sequential(
-            nn.Linear(hidden_size, hidden_size // 2),
+            nn.Linear(320, 160),  # Fixed input dimension
             nn.ReLU(),
             nn.Dropout(0.1),
-            nn.Linear(hidden_size // 2, hidden_size)
+            nn.Linear(160, 320)  # Fixed output dimension
         )
 
         # Initialize contact map predictor
