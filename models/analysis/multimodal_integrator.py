@@ -73,14 +73,23 @@ class MultiModalProteinAnalyzer(nn.Module):
 class CrossModalAttention(nn.Module):
     def __init__(self, hidden_size: int):
         super().__init__()
-        self.sequence_attention = nn.MultiheadAttention(320, num_heads=8)  # Match ESM2 dimensions
-        self.structure_attention = nn.MultiheadAttention(320, num_heads=8)  # Match ESM2 dimensions
+        self.hidden_size = hidden_size
+
+        # Transform structure coordinates to feature space
+        self.structure_encoder = nn.Sequential(
+            nn.Linear(3, 64),
+            nn.ReLU(),
+            nn.Linear(64, 320)  # Match ESM2 dimensions
+        )
+
+        self.sequence_attention = nn.MultiheadAttention(320, num_heads=8)
+        self.structure_attention = nn.MultiheadAttention(320, num_heads=8)
 
         self.feature_combiner = nn.Sequential(
-            nn.Linear(640, 320),  # Combine 320-dim features
+            nn.Linear(640, 320),
             nn.ReLU(),
             nn.Dropout(0.1),
-            nn.Linear(320, 320)  # Output 320-dim features
+            nn.Linear(320, 320)
         )
 
     def forward(
@@ -88,6 +97,14 @@ class CrossModalAttention(nn.Module):
         sequence_features: torch.Tensor,
         structure_features: torch.Tensor
     ) -> torch.Tensor:
+        # Transform structure coordinates to feature space
+        batch_size, seq_len, _ = structure_features.shape
+        structure_features = self.structure_encoder(structure_features)
+
+        # Ensure correct shape for attention: [seq_len, batch_size, hidden_size]
+        sequence_features = sequence_features.transpose(0, 1)
+        structure_features = structure_features.transpose(0, 1)
+
         # Cross attention between sequence and structure
         seq_attended, _ = self.sequence_attention(
             sequence_features,
@@ -101,6 +118,10 @@ class CrossModalAttention(nn.Module):
             sequence_features
         )
 
+        # Return to [batch_size, seq_len, hidden_size]
+        seq_attended = seq_attended.transpose(0, 1)
+        struct_attended = struct_attended.transpose(0, 1)
+
         # Combine attended features
         combined = torch.cat([seq_attended, struct_attended], dim=-1)
         integrated = self.feature_combiner(combined)
@@ -110,11 +131,20 @@ class CrossModalAttention(nn.Module):
 class UnifiedPredictor(nn.Module):
     def __init__(self, hidden_size: int):
         super().__init__()
+        self.hidden_size = hidden_size
+
+        # Transform function results to match feature dimensions
+        self.function_encoder = nn.Sequential(
+            nn.Linear(768, 512),  # From function predictor dimension
+            nn.ReLU(),
+            nn.Linear(512, 320)  # Match ESM2 dimensions
+        )
+
         self.integration_network = nn.Sequential(
             nn.Linear(960, 640),  # 3 * 320-dim features
             nn.ReLU(),
             nn.Dropout(0.1),
-            nn.Linear(640, 320)  # Output 320-dim features
+            nn.Linear(640, 320)
         )
 
         self.confidence_estimator = nn.Sequential(
@@ -130,11 +160,14 @@ class UnifiedPredictor(nn.Module):
         structure_features: torch.Tensor,
         function_results: Dict[str, torch.Tensor]
     ) -> Dict[str, torch.Tensor]:
+        # Transform function features to match dimensions
+        function_features = self.function_encoder(function_results['go_terms'])
+
         # Combine all features
         combined_features = torch.cat([
             sequence_features,
             structure_features,
-            function_results['go_terms']
+            function_features
         ], dim=-1)
 
         # Generate unified representation
