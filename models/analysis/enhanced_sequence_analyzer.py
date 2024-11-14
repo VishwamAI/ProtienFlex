@@ -15,34 +15,34 @@ class EnhancedSequenceAnalyzer(nn.Module):
     def __init__(self, config: Dict):
         super().__init__()
         self.config = config
-        self.hidden_size = 768  # ESM2's output dimension
+        self.hidden_size = 320  # ESM2's actual output dimension
 
         # Initialize protein language model
         self.tokenizer = AutoTokenizer.from_pretrained('facebook/esm2_t6_8M_UR50D')
         self.protein_model = AutoModel.from_pretrained('facebook/esm2_t6_8M_UR50D')
 
-        # Feature extraction layers - maintain 768 dimensions
+        # Feature extraction layers - maintain 320 dimensions
         self.feature_extractor = nn.Sequential(
-            nn.Linear(768, 768),
+            nn.Linear(320, 320),
             nn.ReLU(),
             nn.Dropout(0.1),
-            nn.Linear(768, 768),
+            nn.Linear(320, 320),
             nn.ReLU(),
             nn.Dropout(0.1)
         )
 
-        # Pattern recognition module - maintain 768 dimensions
+        # Pattern recognition module - maintain 320 dimensions
         self.pattern_recognition = nn.Sequential(
-            nn.Linear(768, 768),
+            nn.Linear(320, 320),
             nn.ReLU(),
-            nn.Linear(768, 768)
+            nn.Linear(320, 320)
         )
 
         # Conservation analysis module
         self.conservation_analyzer = ConservationAnalyzer()
 
         # Motif identification module - updated input size
-        self.motif_identifier = MotifIdentifier(768)
+        self.motif_identifier = MotifIdentifier(320)
 
     def forward(self, sequences: List[str]) -> Dict[str, torch.Tensor]:
         # Tokenize sequences
