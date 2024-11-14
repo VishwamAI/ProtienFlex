@@ -18,23 +18,23 @@ class StructurePredictor(nn.Module):
 
         # Backbone prediction network
         self.backbone_predictor = nn.Sequential(
-            nn.Linear(self.hidden_size, self.hidden_size * 2),
+            nn.Linear(80, 160),  # Input from feature extractor (80-dim)
             nn.ReLU(),
             nn.Dropout(0.1),
-            nn.Linear(self.hidden_size * 2, 3)  # (phi, psi, omega) angles
+            nn.Linear(160, 3)  # (phi, psi, omega) angles
         )
 
         # Side chain optimization network
         self.side_chain_optimizer = nn.Sequential(
-            nn.Linear(self.hidden_size + 3, self.hidden_size),
+            nn.Linear(83, 160),  # 80-dim features + 3 backbone angles
             nn.ReLU(),
-            nn.Linear(self.hidden_size, self.hidden_size // 2),
+            nn.Linear(160, 80),
             nn.ReLU(),
-            nn.Linear(self.hidden_size // 2, 4)  # chi angles
+            nn.Linear(80, 4)  # chi angles
         )
 
         # Contact map prediction
-        self.contact_predictor = ContactMapPredictor(self.hidden_size)
+        self.contact_predictor = ContactMapPredictor(80)
 
         # Structure refinement module
         self.structure_refiner = StructureRefiner()
@@ -71,11 +71,11 @@ class StructurePredictor(nn.Module):
 class ContactMapPredictor(nn.Module):
     def __init__(self, hidden_size: int):
         super().__init__()
-        self.attention = nn.MultiheadAttention(hidden_size, num_heads=8)
+        self.attention = nn.MultiheadAttention(80, num_heads=8)  # Updated to match feature dim
         self.mlp = nn.Sequential(
-            nn.Linear(hidden_size, hidden_size // 2),
+            nn.Linear(80, 40),
             nn.ReLU(),
-            nn.Linear(hidden_size // 2, 1)
+            nn.Linear(40, 1)
         )
 
     def forward(self, features: torch.Tensor) -> torch.Tensor:

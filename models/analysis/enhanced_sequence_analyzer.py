@@ -65,7 +65,7 @@ class EnhancedSequenceAnalyzer(nn.Module):
         motif_features = self.motif_identifier(pattern_features)
 
         return {
-            'embeddings': features,
+            'features': features,  # Changed back to 'features' for consistency
             'patterns': pattern_features,
             'conservation': conservation_scores,
             'motifs': motif_features
