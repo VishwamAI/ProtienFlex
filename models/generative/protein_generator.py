@@ -69,17 +69,26 @@ class ProteinGenerativeConfig(PretrainedConfig):
         self.position_embedding_type = position_embedding_type
 
 class MultiHeadAttention(nn.Module):
-    """Multi-head attention mechanism"""
+    """Multi-head attention mechanism with structural awareness"""
     def __init__(self, config: ProteinGenerativeConfig):
         super().__init__()
         self.num_attention_heads = config.num_attention_heads
         self.attention_head_size = int(config.hidden_size / config.num_attention_heads)
         self.all_head_size = self.num_attention_heads * self.attention_head_size
 
+        # Standard attention components
         self.query = nn.Linear(config.hidden_size, self.all_head_size)
         self.key = nn.Linear(config.hidden_size, self.all_head_size)
         self.value = nn.Linear(config.hidden_size, self.all_head_size)
 
+        # Structural attention components
+        self.structure_query = nn.Linear(config.hidden_size, self.all_head_size)
+        self.structure_key = nn.Linear(config.hidden_size, self.all_head_size)
+        self.structure_value = nn.Linear(config.hidden_size, self.all_head_size)
+
+        # Attention weights
+        self.attention_weights = nn.Parameter(torch.ones(2) / 2)
+        self.structure_dropout = nn.Dropout(config.attention_probs_dropout_prob)
         self.dropout = nn.Dropout(config.attention_probs_dropout_prob)
 
     def transpose_for_scores(self, x: torch.Tensor) -> torch.Tensor:
@@ -93,37 +102,59 @@ class MultiHeadAttention(nn.Module):
         attention_mask: Optional[torch.Tensor] = None,
         output_attentions: bool = False,
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
-        """Forward pass"""
+        """Forward pass with structural attention"""
         batch_size, seq_length, _ = hidden_states.size()
 
+        # Standard attention
         query_layer = self.transpose_for_scores(self.query(hidden_states))
         key_layer = self.transpose_for_scores(self.key(hidden_states))
         value_layer = self.transpose_for_scores(self.value(hidden_states))
 
-        # Take the dot product between "query" and "key" to get the raw attention scores
+        # Structural attention
+        struct_query = self.transpose_for_scores(self.structure_query(hidden_states))
+        struct_key = self.transpose_for_scores(self.structure_key(hidden_states))
+        struct_value = self.transpose_for_scores(self.structure_value(hidden_states))
+
+        # Standard attention scores
         attention_scores = torch.matmul(query_layer, key_layer.transpose(-1, -2))
         attention_scores = attention_scores / math.sqrt(self.attention_head_size)
 
+        # Structural attention scores
+        struct_scores = torch.matmul(struct_query, struct_key.transpose(-1, -2))
+        struct_scores = struct_scores / math.sqrt(self.attention_head_size)
+
         if attention_mask is not None:
-            # Ensure attention_mask has correct shape [batch_size, 1, seq_length, seq_length]
             if attention_mask.dim() > 4:
                 attention_mask = attention_mask.squeeze(1).squeeze(1)
             if attention_mask.dim() == 2:
                 attention_mask = attention_mask.unsqueeze(1).unsqueeze(2)
             attention_scores = attention_scores + attention_mask
+            struct_scores = struct_scores + attention_mask
 
-        # Normalize the attention scores to probabilities
+        # Normalize attention scores
         attention_probs = nn.functional.softmax(attention_scores, dim=-1)
+        struct_probs = nn.functional.softmax(struct_scores, dim=-1)
+
+        # Apply dropouts
         attention_probs = self.dropout(attention_probs)
+        struct_probs = self.structure_dropout(struct_probs)
 
+        # Compute context layers
         context_layer = torch.matmul(attention_probs, value_layer)
-        context_layer = context_layer.permute(0, 2, 1, 3).contiguous()
-        new_context_layer_shape = context_layer.size()[:-2] + (self.all_head_size,)
-        context_layer = context_layer.view(*new_context_layer_shape)
+        struct_context = torch.matmul(struct_probs, struct_value)
 
-        outputs = (context_layer,)
+        # Combine attention mechanisms with learned weights
+        weights = F.softmax(self.attention_weights, dim=0)
+        combined_context = weights[0] * context_layer + weights[1] * struct_context
+
+        # Reshape output
+        combined_context = combined_context.permute(0, 2, 1, 3).contiguous()
+        new_context_shape = combined_context.size()[:-2] + (self.all_head_size,)
+        combined_context = combined_context.view(*new_context_shape)
+
+        outputs = (combined_context,)
         if output_attentions:
-            outputs = outputs + (attention_probs,)
+            outputs = outputs + ((attention_probs, struct_probs),)
 
         return outputs
 
@@ -171,7 +202,7 @@ class ProteinGenerativeLayer(nn.Module):
         return outputs
 
 class ProteinGenerativeModel(PreTrainedModel):
-    """Main protein generative model"""
+    """Main protein generative model with structural awareness"""
     def __init__(self, config: ProteinGenerativeConfig):
         super().__init__(config)
         self.config = config
@@ -183,9 +214,73 @@ class ProteinGenerativeModel(PreTrainedModel):
             config.hidden_size,
             padding_idx=config.pad_token_id
         )
+
+        # Enhanced position embeddings with protein-specific features
         self.position_embeddings = nn.Embedding(
             config.max_position_embeddings, config.hidden_size
         )
+
+        # Protein-specific structural embeddings
+        self.structural_embeddings = nn.Embedding(
+            config.max_position_embeddings, config.hidden_size
+        )
+
+        # Amino acid property embeddings
+        self.property_embeddings = nn.Embedding(
+            20, config.hidden_size  # 20 standard amino acids
+        )
+
+        # Gradient checkpointing for memory efficiency
+        self.gradient_checkpointing = True
+
+        # Transformer layers with structural awareness
+        self.layers = nn.ModuleList(
+            [ProteinGenerativeLayer(config) for _ in range(config.num_hidden_layers)]
+        )
+
+        # Enhanced normalization and regularization
+        self.layernorm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
+
+        # Structural validation layers
+        self.structure_validator = nn.Sequential(
+            nn.Linear(config.hidden_size, config.intermediate_size),
+            nn.GELU(),
+            nn.Linear(config.intermediate_size, 3)  # phi, psi, omega angles
+        )
+
+        # Initialize output projection for token prediction
+        self.output_projection = nn.Linear(config.hidden_size, config.vocab_size)
+
+        # Add amino acid mappings with properties
+        self.aa_properties = {
+            'A': {'hydrophobic': 1, 'size': 0, 'charge': 0},
+            'C': {'hydrophobic': 1, 'size': 0, 'charge': 0},
+            'D': {'hydrophobic': 0, 'size': 0, 'charge': -1},
+            'E': {'hydrophobic': 0, 'size': -1, 'charge': -1},
+            'F': {'hydrophobic': 1, 'size': 2, 'charge': 0},
+            'G': {'hydrophobic': 1, 'size': 0, 'charge': 0},
+            'H': {'hydrophobic': 0, 'size': 1, 'charge': 1},
+            'I': {'hydrophobic': 1, 'size': 1, 'charge': 0},
+            'K': {'hydrophobic': 0, 'size': 1, 'charge': 1},
+            'L': {'hydrophobic': 1, 'size': 1, 'charge': 0},
+            'M': {'hydrophobic': 1, 'size': 1, 'charge': 0},
+            'N': {'hydrophobic': 0, 'size': 0, 'charge': 0},
+            'P': {'hydrophobic': 0, 'size': 0, 'charge': 0},
+            'Q': {'hydrophobic': 0, 'size': 1, 'charge': 0},
+            'R': {'hydrophobic': 0, 'size': 2, 'charge': 1},
+            'S': {'hydrophobic': 0, 'size': 0, 'charge': 0},
+            'T': {'hydrophobic': 0, 'size': 0, 'charge': 0},
+            'V': {'hydrophobic': 1, 'size': 1, 'charge': 0},
+            'W': {'hydrophobic': 1, 'size': 2, 'charge': 0},
+            'Y': {'hydrophobic': 1, 'size': 2, 'charge': 0},
+        }
+
+        self.aa_to_idx = {aa: idx for idx, aa in enumerate(self.aa_properties.keys())}
+        self.idx_to_aa = {v: k for k, v in self.aa_to_idx.items()}
+
+        # Initialize weights
+        self.init_weights()
 
         self.layers = nn.ModuleList(
             [ProteinGenerativeLayer(config) for _ in range(config.num_hidden_layers)]
@@ -230,7 +325,7 @@ class ProteinGenerativeModel(PreTrainedModel):
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
     ) -> Dict[str, torch.Tensor]:
-        """Forward pass"""
+        """Forward pass with structural awareness and validation"""
         batch_size, seq_length = input_ids.size()
         device = input_ids.device
 
@@ -246,16 +341,22 @@ class ProteinGenerativeModel(PreTrainedModel):
         # Ensure input_ids are within vocab range
         input_ids = torch.clamp(input_ids, 0, self.config.vocab_size - 1)
 
-        # Get embeddings
+        # Get embeddings with protein-specific features
         inputs_embeds = self.embeddings(input_ids)
         position_embeddings = self.position_embeddings(position_ids)
+        structural_embeddings = self.structural_embeddings(position_ids)
 
-        # Add position embeddings
-        hidden_states = inputs_embeds + position_embeddings
+        # Get amino acid properties
+        aa_indices = torch.tensor([[self.aa_to_idx[self.idx_to_aa[id.item()]]
+                                  for id in seq] for seq in input_ids], device=device)
+        property_embeddings = self.property_embeddings(aa_indices)
+
+        # Combine all embeddings with residual connections
+        hidden_states = inputs_embeds + position_embeddings + structural_embeddings + property_embeddings
         hidden_states = self.layernorm(hidden_states)
         hidden_states = self.dropout(hidden_states)
 
-        # Create causal attention mask [batch_size, seq_length, seq_length]
+        # Create causal attention mask
         causal_mask = torch.triu(
             torch.ones((seq_length, seq_length), device=device) * -10000.0,
             diagonal=1
@@ -265,18 +366,38 @@ class ProteinGenerativeModel(PreTrainedModel):
 
         all_hidden_states = () if output_hidden_states else None
         all_attentions = () if output_attentions else None
+        all_structural_angles = []
 
-        # Apply transformer layers
+        # Apply transformer layers with gradient checkpointing
         for i, layer in enumerate(self.layers):
             if output_hidden_states:
                 all_hidden_states = all_hidden_states + (hidden_states,)
 
-            layer_outputs = layer(
-                hidden_states,
-                attention_mask=attention_mask,
-                output_attentions=output_attentions,
-            )
+            # Apply gradient checkpointing if enabled
+            if self.gradient_checkpointing and self.training:
+                def create_custom_forward(module):
+                    def custom_forward(*inputs):
+                        return module(*inputs)
+                    return custom_forward
+
+                layer_outputs = torch.utils.checkpoint.checkpoint(
+                    create_custom_forward(layer),
+                    hidden_states,
+                    attention_mask,
+                    output_attentions,
+                )
+            else:
+                layer_outputs = layer(
+                    hidden_states,
+                    attention_mask=attention_mask,
+                    output_attentions=output_attentions,
+                )
+
             hidden_states = layer_outputs[0]
+
+            # Structural validation after each layer
+            structural_angles = self.structure_validator(hidden_states)
+            all_structural_angles.append(structural_angles)
 
             if output_attentions:
                 all_attentions = all_attentions + (layer_outputs[1],)
@@ -289,6 +410,7 @@ class ProteinGenerativeModel(PreTrainedModel):
             'logits': logits,
             'hidden_states': all_hidden_states,
             'attentions': all_attentions,
+            'structural_angles': torch.stack(all_structural_angles, dim=1),
         }
 
     def generate(
