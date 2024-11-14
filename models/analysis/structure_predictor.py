@@ -97,21 +97,34 @@ class ContactMapPredictor(nn.Module):
         return contacts
 
 class StructureRefiner(nn.Module):
-    def __init__(self):
+    def __init__(self, config: Dict[str, Any] = None):
+        """Initialize the structure refiner"""
         super().__init__()
-        # Feature processing networks
+        self.config = config or {}
+
+        # Initialize feature processors
         self.backbone_processor = nn.Sequential(
             nn.Linear(320, 160),
             nn.ReLU(),
             nn.Dropout(0.1),
-            nn.Linear(160, 3)  # Output (phi, psi, omega) angles
+            nn.Linear(160, 4)  # phi, psi, omega angles
         )
 
         self.side_chain_processor = nn.Sequential(
             nn.Linear(320, 160),
             nn.ReLU(),
             nn.Dropout(0.1),
-            nn.Linear(160, 4)  # Output chi angles
+            nn.Linear(160, 4)  # chi1, chi2, chi3, chi4 angles
+        )
+
+        # Initialize position predictor for 3D coordinates
+        self.position_predictor = nn.Sequential(
+            nn.Linear(640, 320),  # Combined backbone and side chain features
+            nn.ReLU(),
+            nn.Dropout(0.1),
+            nn.Linear(320, 160),
+            nn.ReLU(),
+            nn.Linear(160, 3)  # x, y, z coordinates
         )
 
     def forward(self, backbone_features: torch.Tensor,
