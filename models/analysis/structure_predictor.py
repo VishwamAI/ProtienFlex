@@ -13,41 +13,39 @@ from transformers import AutoModel
 
 class StructurePredictor(nn.Module):
     def __init__(self, config: Dict = None):
+        """Initialize the structure predictor"""
         super().__init__()
-        if config is None:
-            config = {}
+        self.config = config or {}
+        self.hidden_size = 320  # Match ESM2's output dimension
 
-        hidden_size = config.get('hidden_size', 320)  # Match ESM2 dimensions
-
-        # Initialize backbone prediction network with correct dimensions
-        self.backbone_network = nn.Sequential(
-            nn.Linear(320, 320),  # Fixed input/output dimensions
+        # Feature processing networks
+        self.feature_processor = nn.Sequential(
+            nn.Linear(320, 320),
             nn.ReLU(),
             nn.Dropout(0.1),
-            nn.Linear(320, 320)  # Fixed input/output dimensions
-        )
-
-        # Initialize side chain optimization network with correct dimensions
-        self.side_chain_network = nn.Sequential(
-            nn.Linear(320, 160),  # Fixed input dimension
-            nn.ReLU(),
-            nn.Dropout(0.1),
-            nn.Linear(160, 320)  # Fixed output dimension
+            nn.Linear(320, 320)
         )
 
         # Initialize contact map predictor
         self.contact_predictor = ContactMapPredictor()
 
-        # Initialize structure refinement
-        self.structure_refiner = StructureRefiner()
+        # Initialize structure refiner
+        self.structure_refiner = StructureRefiner(
+            config={
+                'input_dim': 320,
+                'hidden_dim': 320,
+                'refinement_steps': 100,
+                'refinement_lr': 0.01
+            }
+        )
 
     def forward(self, sequence_features: torch.Tensor) -> Dict[str, torch.Tensor]:
         """Forward pass for structure prediction"""
         # Predict backbone features
-        backbone_features = self.backbone_network(sequence_features)  # [batch, seq_len, 320]
+        backbone_features = self.feature_processor(sequence_features)  # [batch, seq_len, 320]
 
         # Predict side chain features
-        side_chain_features = self.side_chain_network(backbone_features)  # [batch, seq_len, 320]
+        side_chain_features = self.feature_processor(backbone_features)  # [batch, seq_len, 320]
 
         # Predict contact map
         contact_map = self.contact_predictor(sequence_features)  # [batch, seq_len, seq_len]
@@ -146,68 +144,58 @@ class StructureRefiner(nn.Module):
         return refined_structure
 
     def _apply_contact_constraints(
-        self,
-        structure: torch.Tensor,
+        self, initial_structure: torch.Tensor,
         contact_map: torch.Tensor,
         backbone_features: torch.Tensor,
-        side_chain_features: torch.Tensor
+        side_chain_features: torch.Tensor,
+        num_steps: int = 100,
+        learning_rate: float = 0.01
     ) -> torch.Tensor:
         """Apply contact map constraints to refine structure"""
-        # Initial structure refinement based on backbone and side chain features
-        refined_coords = []
-        for i in range(structure.size(1)):
-            # Combine backbone and side chain information
-            combined_features = torch.cat([
-                backbone_features[:, i],
-                side_chain_features[:, i]
-            ], dim=-1)
+        # Initialize optimizer
+        current_structure = initial_structure.detach().clone()
+        current_structure.requires_grad = True
+        optimizer = torch.optim.Adam([current_structure], lr=learning_rate)
 
-            # Project to 3D coordinates
-            new_pos = self.position_predictor(combined_features)
-            refined_coords.append(new_pos)
-
-        # Stack refined coordinates
-        refined_structure = torch.stack(refined_coords, dim=1)
-
-        # Create leaf tensor for optimization
-        structure = refined_structure.detach().clone()
-        structure.requires_grad = True
-
-        # Initialize optimizer with leaf tensor
-        optimizer = torch.optim.Adam([structure], lr=self.config.get('refinement_lr', 0.01))
-
-        # Get number of refinement steps from config
-        n_steps = self.config.get('refinement_steps', 100)
-
-        # Optimization loop
-        for _ in range(n_steps):
+        # Refinement loop
+        for step in range(num_steps):
             optimizer.zero_grad()
 
-            # Calculate pairwise distances
-            diffs = structure.unsqueeze(2) - structure.unsqueeze(1)
-            distances = torch.norm(diffs, dim=-1)
+            # Combine features for position prediction
+            batch_size = backbone_features.size(0)
+            seq_len = backbone_features.size(1)
+            combined_features = torch.cat([
+                backbone_features.view(batch_size * seq_len, -1),
+                side_chain_features.view(batch_size * seq_len, -1)
+            ], dim=1)
 
-            # Contact map loss
-            contact_loss = torch.mean(
-                contact_map * torch.relu(distances - 8.0) +
-                (1 - contact_map) * torch.relu(12.0 - distances)
-            )
+            # Predict new positions
+            new_pos = self.position_predictor(combined_features)
+            new_pos = new_pos.view(batch_size, seq_len, 3)
 
-            # Add regularization for reasonable bond lengths
-            bond_lengths = torch.norm(
-                structure[:, 1:] - structure[:, :-1],
-                dim=-1
-            )
-            bond_loss = torch.mean(torch.relu(bond_lengths - 4.0))
+            # Calculate contact map loss
+            distances = torch.cdist(new_pos, new_pos)
+            contact_loss = F.mse_loss(distances, contact_map)
+
+            # Calculate bond length regularization
+            bond_vectors = new_pos[:, 1:] - new_pos[:, :-1]
+            bond_lengths = torch.norm(bond_vectors, dim=2)
+            target_length = torch.full_like(bond_lengths, 3.8)  # Target CA-CA distance
+            bond_loss = F.mse_loss(bond_lengths, target_length)
 
             # Total loss
             loss = contact_loss + 0.1 * bond_loss
 
-            # Backward pass and optimization
-            loss.backward()
+            # Backward pass with retain_graph=True
+            loss.backward(retain_graph=True)
             optimizer.step()
 
-        return structure.detach()
+            # Update current structure
+            with torch.no_grad():
+                current_structure = new_pos.detach().clone()
+                current_structure.requires_grad = True
+
+        return current_structure
 
 
 def create_structure_predictor(config: Dict) -> StructurePredictor:
