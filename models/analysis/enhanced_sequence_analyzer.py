@@ -18,8 +18,8 @@ class EnhancedSequenceAnalyzer(nn.Module):
         self.hidden_size = config.get('hidden_size', 768)
 
         # Initialize protein language model
-        self.tokenizer = AutoTokenizer.from_pretrained('facebook/esm1b-t24-1M')
-        self.protein_model = AutoModel.from_pretrained('facebook/esm1b-t24-1M')
+        self.tokenizer = AutoTokenizer.from_pretrained('facebook/esm1b_t24_1M')
+        self.protein_model = AutoModel.from_pretrained('facebook/esm1b_t24_1M')
 
         # Feature extraction layers
         self.feature_extractor = nn.Sequential(
