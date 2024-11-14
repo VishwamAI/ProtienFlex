@@ -1,5 +1,5 @@
 # ProteinFlex - Advanced Protein Structure Analysis and Drug Discovery
-
+![Visitors](https://api.visitorbadge.io/api/visitors?path=https%3A%2F%2Fgithub.com%2FVishwamAI%2FProtienFlex&countColor=%23ba68c8)
 ## Overview
 ProteinFlex is a comprehensive platform for protein structure analysis and drug discovery, leveraging advanced AI and machine learning techniques. The platform combines state-of-the-art protein structure prediction with interactive visualization and sophisticated drug discovery tools.
 
