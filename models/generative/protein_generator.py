@@ -415,94 +415,146 @@ class ProteinGenerativeModel(PreTrainedModel):
 
     def generate(
         self,
-        input_ids: Union[str, torch.Tensor],
+        prompt_text: str,
         max_length: int = 512,
+        num_return_sequences: int = 1,
         temperature: float = 1.0,
-        do_sample: bool = True,
         top_k: int = 50,
         top_p: float = 0.95,
-        attention_mask: Optional[torch.Tensor] = None,
-        **kwargs,
-    ) -> Union[str, torch.Tensor]:
-        """Generate protein sequences from text or tensor input"""
-        # Handle string input
-        return_text = isinstance(input_ids, str)
-        if return_text:
-            tokens = [self.aa_to_idx.get(aa.upper(), 0) for aa in input_ids if aa.isalpha()]
-            input_ids = torch.tensor([tokens], dtype=torch.long, device=self.device)
+        repetition_penalty: float = 1.0,
+        template_sequence: Optional[str] = None,
+        structural_guidance: bool = True,
+        batch_size: int = 4,
+    ) -> List[str]:
+        """Generate protein sequences with advanced sampling and structural guidance.
 
-        batch_size = input_ids.size(0)
-        current_length = input_ids.size(1)
-        device = input_ids.device
+        Args:
+            prompt_text: Text description of desired protein
+            max_length: Maximum sequence length
+            num_return_sequences: Number of sequences to generate
+            temperature: Sampling temperature
+            top_k: Top-k sampling parameter
+            top_p: Nucleus sampling parameter
+            repetition_penalty: Penalty for repeated tokens
+            template_sequence: Optional template sequence for guided generation
+            structural_guidance: Whether to use structural validation feedback
+            batch_size: Batch size for parallel generation
+        """
+        device = next(self.parameters()).device
 
-        # Ensure input_ids are within vocab range
-        input_ids = torch.clamp(input_ids, 0, self.config.vocab_size - 1)
+        # Encode prompt text
+        encoded = self.tokenizer(prompt_text, return_tensors="pt").to(device)
+        input_ids = encoded["input_ids"]
 
-        # Initialize sequence storage
-        generated = input_ids
+        # Initialize template embeddings if provided
+        template_embeddings = None
+        if template_sequence:
+            template_ids = self.tokenizer(template_sequence, return_tensors="pt").to(device)["input_ids"]
+            template_embeddings = self.embeddings(template_ids)
 
-        # Initialize or extend attention mask
-        if attention_mask is None:
-            attention_mask = torch.ones((batch_size, current_length), device=device)
+        # Generate sequences in parallel batches
+        all_sequences = []
+        for batch_idx in range(0, num_return_sequences, batch_size):
+            batch_size_actual = min(batch_size, num_return_sequences - batch_idx)
 
-        # Generate tokens up to max_length
-        for _ in range(current_length, max_length):
-            # Get model predictions
-            outputs = self.forward(
-                input_ids=generated,
-                attention_mask=attention_mask,
-            )
-            next_token_logits = outputs['logits'][:, -1, :]
+            # Expand inputs for batch generation
+            batch_input_ids = input_ids.expand(batch_size_actual, -1)
 
-            # Apply temperature
-            next_token_logits = next_token_logits / temperature
+            # Initialize sequence buffers
+            current_length = batch_input_ids.shape[1]
+            batch_sequences = batch_input_ids.clone()
 
-            # Apply top-k filtering
-            if top_k > 0:
-                # Limit top_k to vocabulary size
-                top_k = min(top_k, self.config.vocab_size)
-                # Get top k logits and indices
-                top_k_logits, _ = torch.topk(next_token_logits, top_k)
-                # Create mask for values below threshold
-                indices_to_remove = next_token_logits < top_k_logits[..., -1, None]
-                next_token_logits[indices_to_remove] = float('-inf')
+            while current_length < max_length:
+                # Get model predictions
+                outputs = self.forward(
+                    input_ids=batch_sequences,
+                    output_attentions=True,
+                    output_hidden_states=True,
+                )
 
-            # Apply top-p (nucleus) filtering
-            if top_p < 1.0:
-                # Sort logits and get probabilities
-                sorted_logits, _ = torch.sort(next_token_logits, dim=-1, descending=True)
-                cumulative_probs = torch.cumsum(torch.softmax(sorted_logits, dim=-1), dim=-1)
+                next_token_logits = outputs["logits"][:, -1, :]
 
-                # Remove tokens with cumulative probability above the threshold
-                sorted_indices_to_remove = cumulative_probs > top_p
+                # Apply temperature
+                next_token_logits = next_token_logits / temperature
 
-                # Set logits below threshold to -inf
-                next_token_logits_sorted = sorted_logits.masked_fill(sorted_indices_to_remove, float('-inf'))
-                # Get indices to sort back to original order
-                _, orig_indices = torch.sort(torch.sort(next_token_logits, dim=-1, descending=True)[1], dim=-1)
-                # Restore original order
-                next_token_logits = torch.gather(next_token_logits_sorted, -1, orig_indices)
+                # Apply repetition penalty
+                for seq_idx in range(batch_size_actual):
+                    for prev_token in batch_sequences[seq_idx]:
+                        next_token_logits[seq_idx, prev_token] /= repetition_penalty
 
-            # Sample next token
-            if do_sample:
+                # Apply top-k filtering
+                if top_k > 0:
+                    indices_to_remove = next_token_logits < torch.topk(next_token_logits, top_k)[0][..., -1, None]
+                    next_token_logits[indices_to_remove] = float('-inf')
+
+                # Apply nucleus (top-p) filtering
+                if top_p < 1.0:
+                    sorted_logits, sorted_indices = torch.sort(next_token_logits, descending=True)
+                    cumulative_probs = torch.cumsum(torch.softmax(sorted_logits, dim=-1), dim=-1)
+                    sorted_indices_to_remove = cumulative_probs > top_p
+                    sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
+                    sorted_indices_to_remove[..., 0] = 0
+                    indices_to_remove = sorted_indices_to_remove.scatter(1, sorted_indices, sorted_indices_to_remove)
+                    next_token_logits[indices_to_remove] = float('-inf')
+
+                # Apply structural guidance if enabled
+                if structural_guidance and "structural_angles" in outputs:
+                    structural_scores = self._evaluate_structural_validity(outputs["structural_angles"])
+                    next_token_logits += structural_scores.unsqueeze(-1)
+
+                # Apply template guidance if provided
+                if template_embeddings is not None:
+                    template_scores = self._compute_template_similarity(
+                        outputs["last_hidden_state"],
+                        template_embeddings,
+                        current_length
+                    )
+                    next_token_logits += template_scores.unsqueeze(-1)
+
+                # Sample next tokens
                 probs = torch.softmax(next_token_logits, dim=-1)
-                next_token = torch.multinomial(probs, num_samples=1)
-            else:
-                next_token = torch.argmax(next_token_logits, dim=-1, keepdim=True)
+                next_tokens = torch.multinomial(probs, num_samples=1)
 
-            # Append next token to sequence
-            generated = torch.cat([generated, next_token], dim=1)
-            attention_mask = torch.cat([
-                attention_mask,
-                torch.ones((batch_size, 1), device=device)
-            ], dim=1)
+                # Append to sequences
+                batch_sequences = torch.cat([batch_sequences, next_tokens], dim=1)
+                current_length += 1
 
-        # Convert output to text if input was string
-        if return_text:
-            sequences = []
-            for seq in generated.cpu().numpy():
-                sequence = ''.join(self.idx_to_aa.get(token, 'X') for token in seq)
-                sequences.append(sequence)
-            return sequences[0] if len(sequences) == 1 else sequences
+                # Check for end of sequence token
+                if (batch_sequences == self.tokenizer.eos_token_id).any(dim=1).all():
+                    break
 
-        return generated
+            # Decode generated sequences
+            for seq in batch_sequences:
+                protein_sequence = self.tokenizer.decode(seq, skip_special_tokens=True)
+                all_sequences.append(protein_sequence)
+
+        return all_sequences[:num_return_sequences]
+
+    def _evaluate_structural_validity(self, structural_angles: torch.Tensor) -> torch.Tensor:
+        """Evaluate structural validity of generated angles."""
+        # Implement Ramachandran plot validation
+        phi, psi, omega = structural_angles[..., 0], structural_angles[..., 1], structural_angles[..., 2]
+
+        # Check if angles are within allowed regions
+        valid_phi = (-180 <= phi) & (phi <= 180)
+        valid_psi = (-180 <= psi) & (psi <= 180)
+        valid_omega = (-180 <= omega) & (omega <= 180)
+
+        # Combine validations and convert to score
+        validity_score = (valid_phi & valid_psi & valid_omega).float()
+        return validity_score
+
+    def _compute_template_similarity(
+        self,
+        hidden_states: torch.Tensor,
+        template_embeddings: torch.Tensor,
+        current_position: int
+    ) -> torch.Tensor:
+        """Compute similarity scores between generated sequences and template."""
+        # Get relevant embeddings for current position
+        current_embeddings = hidden_states[:, -1, :]
+        template_pos_embeddings = template_embeddings[:, current_position, :]
+
+        # Compute cosine similarity
+        similarity = torch.cosine_similarity(current_embeddings, template_pos_embeddings, dim=-1)
+        return similarity
