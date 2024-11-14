@@ -88,10 +88,10 @@ class ContactMapPredictor(nn.Module):
         contacts = []
 
         for i in range(seq_len):
-            for j in range(seq_len):
-                pair_features = torch.cat([attn_output[:, i], attn_output[:, j]], dim=-1)
-                contact_prob = self.mlp(pair_features)
-                contacts.append(contact_prob)
+            # Use only the relevant features for each position
+            pair_features = attn_output[:, i]  # Only use features from position i
+            contact_prob = self.mlp(pair_features)
+            contacts.append(contact_prob)
 
         contact_map = torch.stack(contacts, dim=1).view(batch_size, seq_len, seq_len)
         return contact_map
