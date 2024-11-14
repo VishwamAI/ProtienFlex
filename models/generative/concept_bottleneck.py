@@ -130,8 +130,8 @@ class LoRALayer(nn.Module):
         nn.init.zeros_(self.lora_up.weight)
 
     def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
-        """Apply LoRA transformation"""
+        """Apply LoRA transformation with residual connection"""
         dropped_hidden = self.lora_dropout(hidden_states)
         down_hidden = self.lora_down(dropped_hidden)
         up_hidden = self.lora_up(down_hidden)
-        return up_hidden * self.scaling
+        return hidden_states + (up_hidden * self.scaling)
