@@ -118,7 +118,8 @@ class LoRALayer(nn.Module):
         super().__init__()
         self.hidden_size = hidden_size
         self.lora_alpha = lora_alpha
-        self.scaling = lora_alpha / lora_rank
+        # Increase base scaling for more noticeable effect while maintaining stability
+        self.scaling = lora_alpha / (lora_rank * 0.5)  # Adjusted scaling factor
 
         # LoRA components
         self.lora_dropout = nn.Dropout(lora_dropout)
@@ -126,8 +127,8 @@ class LoRALayer(nn.Module):
         self.lora_up = nn.Linear(lora_rank, hidden_size, bias=False)
 
         # Initialize weights
-        nn.init.kaiming_uniform_(self.lora_down.weight, a=math.sqrt(5))
-        nn.init.zeros_(self.lora_up.weight)
+        nn.init.normal_(self.lora_down.weight, mean=0.0, std=0.02)
+        nn.init.normal_(self.lora_up.weight, mean=0.0, std=0.02)
 
     def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
         """Apply LoRA transformation with residual connection"""
