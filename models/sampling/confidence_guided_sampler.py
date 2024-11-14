@@ -164,9 +164,9 @@ class ConfidenceGuidedSampler(nn.Module):
         Compute training loss.
 
         Args:
-            x: Input protein features
-            noise: Target noise
-            pred_noise: Predicted noise
+            x: Input protein features [batch_size, seq_len, feature_dim]
+            noise: Target noise [batch_size, seq_len, feature_dim]
+            pred_noise: Predicted noise [batch_size, seq_len, feature_dim]
 
         Returns:
             Combined loss value
@@ -175,8 +175,14 @@ class ConfidenceGuidedSampler(nn.Module):
         noise_loss = F.mse_loss(pred_noise, noise)
 
         # Confidence loss to encourage accurate confidence estimation
-        confidence = self.confidence_net(x)
-        confidence_target = torch.exp(-F.mse_loss(pred_noise, noise, reduction='none').mean(-1))
+        confidence = self.confidence_net(x)  # [batch_size, seq_len, 1]
+        confidence = confidence.squeeze(-1)  # [batch_size, seq_len]
+
+        # Compute per-residue noise prediction accuracy
+        noise_error = F.mse_loss(pred_noise, noise, reduction='none')  # [batch_size, seq_len, feature_dim]
+        confidence_target = torch.exp(-noise_error.mean(-1))  # [batch_size, seq_len]
+
+        # Binary cross entropy loss for confidence prediction
         confidence_loss = F.binary_cross_entropy(confidence, confidence_target)
 
         return noise_loss + confidence_loss

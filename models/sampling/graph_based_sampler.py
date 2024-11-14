@@ -6,20 +6,20 @@ Implements message passing and local structure preservation.
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from typing import Dict, Tuple, Optional, List
+from typing import Dict, Tuple, Optional
 
 class MessagePassingLayer(nn.Module):
     def __init__(
         self,
-        node_dim: int,
-        edge_dim: int,
-        hidden_dim: int,
+        node_dim: int = 768,
+        edge_dim: int = 64,
+        hidden_dim: int = 512,
         dropout: float = 0.1
     ):
         """Initialize message passing layer."""
         super().__init__()
         self.node_update = nn.Sequential(
-            nn.Linear(node_dim + edge_dim + node_dim, hidden_dim),
+            nn.Linear(node_dim + edge_dim, hidden_dim),
             nn.LayerNorm(hidden_dim),
             nn.ReLU(),
             nn.Dropout(dropout),
@@ -52,18 +52,23 @@ class MessagePassingLayer(nn.Module):
             Updated node and edge features
         """
         B, N, D = nodes.shape
+        _, _, _, E = edges.shape
 
         # Aggregate messages for nodes
-        messages = torch.einsum('bijk,bik->bij', edges * adjacency.unsqueeze(-1), nodes)
-        node_input = torch.cat([nodes, messages], dim=-1)
-        nodes_updated = nodes + self.node_update(node_input)
+        edges_adj = edges * adjacency.unsqueeze(-1)  # [B, N, N, E]
+        nodes_expanded = nodes.unsqueeze(2).expand(-1, -1, N, -1)  # [B, N, N, D]
+
+        # Compute messages
+        messages = torch.cat([edges_adj, nodes_expanded], dim=-1)  # [B, N, N, E+D]
+        messages = messages.sum(dim=2)  # [B, N, E+D]
+
+        # Update nodes
+        nodes_updated = nodes + self.node_update(messages)
 
         # Update edges
-        node_pairs = torch.cat([
-            nodes.unsqueeze(2).expand(-1, -1, N, -1),
-            nodes.unsqueeze(1).expand(-1, N, -1, -1)
-        ], dim=-1)
-        edge_input = torch.cat([edges, node_pairs], dim=-1)
+        nodes_i = nodes.unsqueeze(2).expand(-1, -1, N, -1)  # [B, N, N, D]
+        nodes_j = nodes.unsqueeze(1).expand(-1, N, -1, -1)  # [B, N, N, D]
+        edge_input = torch.cat([edges, nodes_i, nodes_j], dim=-1)  # [B, N, N, E+2D]
         edges_updated = edges + self.edge_update(edge_input)
 
         return nodes_updated, edges_updated
@@ -93,7 +98,7 @@ class GraphBasedSampler(nn.Module):
 
         # Edge feature initialization
         self.edge_embedding = nn.Sequential(
-            nn.Linear(1, edge_dim),  # Distance-based initialization
+            nn.Linear(1, edge_dim),
             nn.LayerNorm(edge_dim),
             nn.ReLU()
         )
@@ -112,30 +117,25 @@ class GraphBasedSampler(nn.Module):
             nn.Linear(hidden_dim, 3)  # 3D coordinates
         )
 
-        # Final node update
-        self.node_output = nn.Sequential(
-            nn.Linear(node_dim, hidden_dim),
-            nn.LayerNorm(hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, node_dim)
-        )
-
     def initialize_edges(
         self,
         coords: torch.Tensor
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Initialize edge features from coordinates."""
         B, N = coords.shape[:2]
+        device = coords.device
 
         # Compute pairwise distances
-        diff = coords.unsqueeze(2) - coords.unsqueeze(1)
-        distances = torch.norm(diff, dim=-1, keepdim=True)
+        coords_i = coords.unsqueeze(2)  # [B, N, 1, 3]
+        coords_j = coords.unsqueeze(1)  # [B, 1, N, 3]
+        diff = coords_i - coords_j  # [B, N, N, 3]
+        distances = torch.norm(diff, dim=-1, keepdim=True)  # [B, N, N, 1]
 
         # Create adjacency matrix (connect nearby residues)
-        adjacency = (distances.squeeze(-1) < 10.0).float()  # 10Å cutoff
+        adjacency = (distances.squeeze(-1) < 10.0).float()  # [B, N, N]
 
         # Initialize edge features
-        edges = self.edge_embedding(distances)
+        edges = self.edge_embedding(distances)  # [B, N, N, edge_dim]
 
         return edges, adjacency
 
@@ -171,13 +171,10 @@ class GraphBasedSampler(nn.Module):
                 adjacency
             )
 
-        # Final node update
-        nodes_updated = self.node_output(current_nodes)
-
         # Predict coordinates
-        coords_pred = self.structure_preserving(nodes_updated)
+        coords_pred = self.structure_preserving(current_nodes)
 
-        return nodes_updated, coords_pred
+        return current_nodes, coords_pred
 
     def sample(
         self,
