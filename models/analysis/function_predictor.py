@@ -14,8 +14,21 @@ class FunctionPredictor(nn.Module):
     def __init__(self, config: Dict):
         super().__init__()
         self.config = config
-        self.hidden_size = config.get('hidden_size', 320)
+        self.hidden_size = config.get('hidden_size', 768)  # Match ESM2 dimensions
         self.num_go_terms = config.get('num_go_terms', 1000)
+
+        # Feature dimension reduction
+        self.sequence_encoder = nn.Sequential(
+            nn.Linear(768, 512),  # From ESM2 dimension
+            nn.ReLU(),
+            nn.Linear(512, self.hidden_size)
+        )
+
+        self.structure_encoder = nn.Sequential(
+            nn.Linear(3, 64),  # From 3D coordinates
+            nn.ReLU(),
+            nn.Linear(64, self.hidden_size)
+        )
 
         # GO term prediction network
         self.go_predictor = nn.Sequential(
@@ -47,9 +60,13 @@ class FunctionPredictor(nn.Module):
         sequence_features: torch.Tensor,
         structure_features: torch.Tensor
     ) -> Dict[str, torch.Tensor]:
+        # Transform input features to correct dimensions
+        sequence_encoded = self.sequence_encoder(sequence_features)
+        structure_encoded = self.structure_encoder(structure_features)
+
         # Combine sequence and structure features using feature fusion
         combined_features = self.feature_fusion(
-            torch.cat([sequence_features, structure_features], dim=-1)
+            torch.cat([sequence_encoded, structure_encoded], dim=-1)
         )
 
         # Predict GO terms
