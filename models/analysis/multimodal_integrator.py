@@ -73,14 +73,14 @@ class MultiModalProteinAnalyzer(nn.Module):
 class CrossModalAttention(nn.Module):
     def __init__(self, hidden_size: int):
         super().__init__()
-        self.sequence_attention = nn.MultiheadAttention(80, num_heads=8)  # Match feature dimensions
-        self.structure_attention = nn.MultiheadAttention(80, num_heads=8)  # Match feature dimensions
+        self.sequence_attention = nn.MultiheadAttention(768, num_heads=8)  # Match ESM2 dimensions
+        self.structure_attention = nn.MultiheadAttention(768, num_heads=8)  # Match ESM2 dimensions
 
         self.feature_combiner = nn.Sequential(
-            nn.Linear(160, 80),  # Combine 80-dim features
+            nn.Linear(1536, 768),  # Combine 768-dim features
             nn.ReLU(),
             nn.Dropout(0.1),
-            nn.Linear(80, 80)  # Output 80-dim features
+            nn.Linear(768, 768)  # Output 768-dim features
         )
 
     def forward(
@@ -111,16 +111,16 @@ class UnifiedPredictor(nn.Module):
     def __init__(self, hidden_size: int):
         super().__init__()
         self.integration_network = nn.Sequential(
-            nn.Linear(240, 160),  # 3 * 80-dim features
+            nn.Linear(2304, 1536),  # 3 * 768-dim features
             nn.ReLU(),
             nn.Dropout(0.1),
-            nn.Linear(160, 80)  # Output 80-dim features
+            nn.Linear(1536, 768)  # Output 768-dim features
         )
 
         self.confidence_estimator = nn.Sequential(
-            nn.Linear(80, 40),
+            nn.Linear(768, 384),
             nn.ReLU(),
-            nn.Linear(40, 1),
+            nn.Linear(384, 1),
             nn.Sigmoid()
         )
 
