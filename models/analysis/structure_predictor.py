@@ -5,7 +5,8 @@ Implements advanced structure prediction with multi-modal integration
 
 import torch
 import torch.nn as nn
-from typing import Dict, List, Optional, Tuple
+import torch.nn.functional as F
+from typing import Dict, Any, List, Tuple, Optional
 import numpy as np
 from Bio.PDB import *
 from transformers import AutoModel
