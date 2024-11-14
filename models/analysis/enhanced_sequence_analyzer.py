@@ -48,8 +48,10 @@ class EnhancedSequenceAnalyzer(nn.Module):
         # Tokenize sequences
         encoded = self.tokenizer(sequences, return_tensors="pt", padding=True)
 
-        # Get protein embeddings
-        protein_features = self.protein_model(**encoded).last_hidden_state
+        # Get protein embeddings and detach to create leaf tensor
+        with torch.no_grad():
+            protein_features = self.protein_model(**encoded).last_hidden_state.clone()
+        protein_features.requires_grad = True
 
         # Extract features
         features = self.feature_extractor(protein_features)
@@ -59,12 +61,13 @@ class EnhancedSequenceAnalyzer(nn.Module):
 
         # Conservation analysis
         conservation_scores = self.conservation_analyzer(sequences)
+        conservation_scores = conservation_scores.float().unsqueeze(-1).expand(-1, -1, self.hidden_size)
 
         # Motif identification
         motif_features = self.motif_identifier(pattern_features)
 
         return {
-            'features': features,  # Changed back to 'features' for consistency
+            'features': features,
             'patterns': pattern_features,
             'conservation': conservation_scores,
             'motifs': motif_features

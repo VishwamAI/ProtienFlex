@@ -131,55 +131,63 @@ class StructureRefiner(nn.Module):
 
     def _apply_contact_constraints(
         self,
-        backbone_angles: torch.Tensor,
-        side_chain_angles: torch.Tensor,
-        contact_map: torch.Tensor
+        structure: torch.Tensor,
+        contact_map: torch.Tensor,
+        backbone_features: torch.Tensor,
+        side_chain_features: torch.Tensor
     ) -> torch.Tensor:
-        """Apply contact map constraints to refine the predicted structure"""
-        batch_size, seq_len, _ = backbone_angles.shape
+        """Apply contact map constraints to refine structure"""
+        # Initial structure refinement based on backbone and side chain features
+        refined_coords = []
+        for i in range(structure.size(1)):
+            # Combine backbone and side chain information
+            combined_features = torch.cat([
+                backbone_features[:, i],
+                side_chain_features[:, i]
+            ], dim=-1)
 
-        # Initialize structure tensor
-        structure = torch.zeros(batch_size, seq_len, 3, device=backbone_angles.device)
+            # Project to 3D coordinates
+            new_pos = self.position_predictor(combined_features)
+            refined_coords.append(new_pos)
 
-        # Convert angles to 3D coordinates
-        for i in range(seq_len):
-            if i > 0:
-                # Use previous residue position and current angles
-                prev_pos = structure[:, i-1]
-                curr_backbone = backbone_angles[:, i]
-                curr_sidechain = side_chain_angles[:, i]
+        # Stack refined coordinates
+        refined_structure = torch.stack(refined_coords, dim=1)
 
-                # Calculate new position using geometric transformations
-                phi, psi, omega = curr_backbone.unbind(-1)
-                chi1, chi2, chi3, chi4 = curr_sidechain.unbind(-1)
+        # Create leaf tensor for optimization
+        structure = refined_structure.detach().clone()
+        structure.requires_grad = True
 
-                # Apply geometric transformations (simplified for demonstration)
-                new_pos = prev_pos + torch.stack([
-                    torch.cos(phi) * torch.cos(psi),
-                    torch.sin(phi) * torch.cos(psi),
-                    torch.sin(psi)
-                ], dim=-1) * 3.8  # Approximate CA-CA distance
+        # Initialize optimizer with leaf tensor
+        optimizer = torch.optim.Adam([structure], lr=self.config.get('refinement_lr', 0.01))
 
-                structure[:, i] = new_pos
+        # Get number of refinement steps from config
+        n_steps = self.config.get('refinement_steps', 100)
 
-        # Apply contact map constraints through gradient descent
-        structure.requires_grad_(True)
-        optimizer = torch.optim.Adam([structure], lr=0.01)
-
-        for _ in range(50):  # Refinement iterations
+        # Optimization loop
+        for _ in range(n_steps):
             optimizer.zero_grad()
 
             # Calculate pairwise distances
-            dists = torch.cdist(structure, structure)
+            diffs = structure.unsqueeze(2) - structure.unsqueeze(1)
+            distances = torch.norm(diffs, dim=-1)
 
             # Contact map loss
-            contact_loss = torch.mean((dists - 8.0).abs() * contact_map)  # 8Å threshold
+            contact_loss = torch.mean(
+                contact_map * torch.relu(distances - 8.0) +
+                (1 - contact_map) * torch.relu(12.0 - distances)
+            )
 
-            # Chain connectivity loss
-            chain_loss = torch.mean((dists.diagonal(dim1=1, dim2=2) - 3.8).abs())
+            # Add regularization for reasonable bond lengths
+            bond_lengths = torch.norm(
+                structure[:, 1:] - structure[:, :-1],
+                dim=-1
+            )
+            bond_loss = torch.mean(torch.relu(bond_lengths - 4.0))
 
             # Total loss
-            loss = contact_loss + chain_loss
+            loss = contact_loss + 0.1 * bond_loss
+
+            # Backward pass and optimization
             loss.backward()
             optimizer.step()
 
