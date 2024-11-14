@@ -22,18 +22,18 @@ class MultiModalProteinAnalyzer(nn.Module):
 
         # Cross-modal attention for feature integration
         self.cross_modal_attention = CrossModalAttention(
-            config.get('hidden_size', 768)
+            config.get('hidden_size', 320)  # Updated to match ESM2 dimensions
         )
 
         # Unified prediction head
         self.unified_predictor = UnifiedPredictor(
-            config.get('hidden_size', 768)
+            config.get('hidden_size', 320)  # Updated to match ESM2 dimensions
         )
 
     def forward(self, sequences: List[str]) -> Dict[str, torch.Tensor]:
         # Analyze sequences
         sequence_results = self.sequence_analyzer(sequences)
-        sequence_features = sequence_results['features']
+        sequence_features = sequence_results['embeddings']  # Updated to match new key name
 
         # Predict structure
         structure_results = self.structure_predictor(sequence_features)

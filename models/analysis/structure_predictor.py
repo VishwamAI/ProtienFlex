@@ -14,7 +14,7 @@ class StructurePredictor(nn.Module):
     def __init__(self, config: Dict):
         super().__init__()
         self.config = config
-        self.hidden_size = config.get('hidden_size', 768)
+        self.hidden_size = config.get('hidden_size', 320)
 
         # Backbone prediction network
         self.backbone_predictor = nn.Sequential(

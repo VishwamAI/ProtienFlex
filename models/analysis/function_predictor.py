@@ -14,7 +14,7 @@ class FunctionPredictor(nn.Module):
     def __init__(self, config: Dict):
         super().__init__()
         self.config = config
-        self.hidden_size = config.get('hidden_size', 768)
+        self.hidden_size = config.get('hidden_size', 320)
         self.num_go_terms = config.get('num_go_terms', 1000)
 
         # GO term prediction network
@@ -35,13 +35,22 @@ class FunctionPredictor(nn.Module):
         # Binding site predictor
         self.binding_predictor = BindingSitePredictor(self.hidden_size)
 
+        # Feature fusion layer
+        self.feature_fusion = nn.Sequential(
+            nn.Linear(self.hidden_size * 2, self.hidden_size),
+            nn.ReLU(),
+            nn.Dropout(0.1)
+        )
+
     def forward(
         self,
         sequence_features: torch.Tensor,
         structure_features: torch.Tensor
     ) -> Dict[str, torch.Tensor]:
-        # Combine sequence and structure features
-        combined_features = torch.cat([sequence_features, structure_features], dim=-1)
+        # Combine sequence and structure features using feature fusion
+        combined_features = self.feature_fusion(
+            torch.cat([sequence_features, structure_features], dim=-1)
+        )
 
         # Predict GO terms
         go_predictions = self.go_predictor(combined_features)
