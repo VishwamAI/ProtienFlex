@@ -76,13 +76,18 @@ class TestLoRALayer(unittest.TestCase):
         self.lora_rank = 8
         self.batch_size = 4
         self.seq_length = 16
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+        # Initialize model components
         self.lora_layer = LoRALayer(
             hidden_size=self.hidden_size,
-            rank=self.lora_rank
-        ).to(self.device)
+            lora_rank=self.lora_rank
+        )
 
+        # Move to available device
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.lora_layer = self.lora_layer.to(self.device)
+
+        # Create test inputs
         self.hidden_states = torch.randn(
             self.batch_size,
             self.seq_length,

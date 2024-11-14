@@ -221,7 +221,7 @@ class ProteinGenerativeModel(PreTrainedModel):
     def __init__(self, config: ProteinGenerativeConfig):
         super().__init__(config)
         self.config = config
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.register_buffer("_device_buffer", torch.zeros(1), persistent=False)
 
         # Initialize embeddings with proper padding
         self.embeddings = nn.Embedding(
@@ -325,16 +325,18 @@ class ProteinGenerativeModel(PreTrainedModel):
         # Track concept interpretations
         self.concept_activations = {}
 
+    @property
+    def device(self) -> torch.device:
+        return self._device_buffer.device
+
+    def to(self, device: torch.device) -> 'ProteinGenerativeModel':
+        return super().to(device)
+
     def get_input_embeddings(self) -> nn.Module:
         return self.embeddings
 
     def set_input_embeddings(self, value: nn.Module):
         self.embeddings = value
-
-    def _prune_heads(self, heads_to_prune: Dict[int, List[int]]):
-        """Prunes heads of the model"""
-        for layer, heads in heads_to_prune.items():
-            self.layers[layer].attention.prune_heads(heads)
 
     def forward(
         self,
@@ -619,6 +621,9 @@ class ProteinGenerativeModel(PreTrainedModel):
 
     def _evaluate_structural_validity(self, structural_angles: torch.Tensor) -> torch.Tensor:
         """Evaluate structural validity of generated angles"""
+        # Ensure angles are on correct device
+        structural_angles = structural_angles.to(self.device)
+
         # Convert angles to radians
         angles_rad = structural_angles * math.pi / 180.0
 
@@ -631,8 +636,8 @@ class ProteinGenerativeModel(PreTrainedModel):
         allowed_score = torch.where(
             (phi >= -math.pi/3) & (phi <= math.pi/3) &
             (psi >= -math.pi/3) & (psi <= math.pi/3),
-            torch.ones_like(phi),
-            torch.zeros_like(phi)
+            torch.ones_like(phi, device=self.device),
+            torch.zeros_like(phi, device=self.device)
         )
 
         # Score planarity of peptide bond
@@ -647,19 +652,26 @@ class ProteinGenerativeModel(PreTrainedModel):
     ) -> torch.Tensor:
         """Evaluate alignment between current and target concepts"""
         if target_concepts is None:
-            return torch.zeros(current_concepts[list(current_concepts.keys())[0]].size(0), device=current_concepts[list(current_concepts.keys())[0]].device)
+            return torch.zeros(
+                current_concepts[list(current_concepts.keys())[0]].size(0),
+                device=self.device
+            )
 
         alignment_scores = []
         for concept_type, target_value in target_concepts.items():
             if concept_type in current_concepts:
-                current_value = current_concepts[concept_type]
+                current_value = current_concepts[concept_type].to(self.device)
+                target_tensor = torch.tensor(target_value, device=self.device)
                 # Calculate similarity between current and target concept values
-                diff = torch.abs(current_value - target_value)
+                diff = torch.abs(current_value - target_tensor)
                 alignment_score = 1.0 - diff.mean(dim=-1)
                 alignment_scores.append(alignment_score)
 
         if not alignment_scores:
-            return torch.zeros(current_concepts[list(current_concepts.keys())[0]].size(0), device=current_concepts[list(current_concepts.keys())[0]].device)
+            return torch.zeros(
+                current_concepts[list(current_concepts.keys())[0]].size(0),
+                device=self.device
+            )
 
         return torch.stack(alignment_scores).mean(dim=0)
 
