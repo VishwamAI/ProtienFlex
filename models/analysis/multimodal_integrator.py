@@ -22,12 +22,12 @@ class MultiModalProteinAnalyzer(nn.Module):
 
         # Cross-modal attention for feature integration
         self.cross_modal_attention = CrossModalAttention(
-            config.get('hidden_size', 320)  # Updated to match ESM2 dimensions
+            config.get('hidden_size', 768)  # Updated to match ESM2 dimensions
         )
 
         # Unified prediction head
         self.unified_predictor = UnifiedPredictor(
-            config.get('hidden_size', 320)  # Updated to match ESM2 dimensions
+            config.get('hidden_size', 768)  # Updated to match ESM2 dimensions
         )
 
     def forward(self, sequences: List[str]) -> Dict[str, torch.Tensor]:
@@ -77,19 +77,19 @@ class CrossModalAttention(nn.Module):
 
         # Transform structure coordinates to feature space
         self.structure_encoder = nn.Sequential(
-            nn.Linear(3, 64),
+            nn.Linear(3, 128),
             nn.ReLU(),
-            nn.Linear(64, 320)  # Match ESM2 dimensions
+            nn.Linear(128, 768)  # Match ESM2 dimensions
         )
 
-        self.sequence_attention = nn.MultiheadAttention(320, num_heads=8)
-        self.structure_attention = nn.MultiheadAttention(320, num_heads=8)
+        self.sequence_attention = nn.MultiheadAttention(768, num_heads=8)
+        self.structure_attention = nn.MultiheadAttention(768, num_heads=8)
 
         self.feature_combiner = nn.Sequential(
-            nn.Linear(640, 320),
+            nn.Linear(1536, 1024),  # 768 * 2 for concatenated features
             nn.ReLU(),
             nn.Dropout(0.1),
-            nn.Linear(320, 320)
+            nn.Linear(1024, 768)  # Output matches ESM2 dimensions
         )
 
     def forward(
@@ -135,22 +135,22 @@ class UnifiedPredictor(nn.Module):
 
         # Transform function results to match feature dimensions
         self.function_encoder = nn.Sequential(
-            nn.Linear(768, 512),  # From function predictor dimension
+            nn.Linear(768, 768),  # Maintain ESM2 dimensions
             nn.ReLU(),
-            nn.Linear(512, 320)  # Match ESM2 dimensions
+            nn.Linear(768, 768)  # Match ESM2 dimensions
         )
 
         self.integration_network = nn.Sequential(
-            nn.Linear(960, 640),  # 3 * 320-dim features
+            nn.Linear(2304, 1536),  # 3 * 768-dim features
             nn.ReLU(),
             nn.Dropout(0.1),
-            nn.Linear(640, 320)
+            nn.Linear(1536, 768)  # Match ESM2 dimensions
         )
 
         self.confidence_estimator = nn.Sequential(
-            nn.Linear(320, 160),
+            nn.Linear(768, 384),
             nn.ReLU(),
-            nn.Linear(160, 1),
+            nn.Linear(384, 1),
             nn.Sigmoid()
         )
 
