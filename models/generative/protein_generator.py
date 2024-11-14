@@ -33,6 +33,7 @@ import numpy as np
 import os
 import google.generativeai as genai
 import asyncio
+from .concept_bottleneck import ConceptBottleneckLayer, LoRALayer
 
 class ProteinGenerativeConfig(PretrainedConfig):
     """Configuration class for protein generation model"""
@@ -51,6 +52,13 @@ class ProteinGenerativeConfig(PretrainedConfig):
         layer_norm_eps: float = 1e-12,
         pad_token_id: int = 0,
         position_embedding_type: str = "absolute",
+        # Concept Bottleneck parameters
+        num_concepts: int = 64,
+        concept_groups: int = 4,
+        # LoRA parameters
+        lora_rank: int = 8,
+        lora_alpha: float = 16,
+        lora_dropout: float = 0.1,
         **kwargs,
     ):
         super().__init__(
@@ -67,6 +75,13 @@ class ProteinGenerativeConfig(PretrainedConfig):
         self.attention_probs_dropout_prob = attention_probs_dropout_prob
         self.max_position_embeddings = max_position_embeddings
         self.position_embedding_type = position_embedding_type
+        # Concept Bottleneck parameters
+        self.num_concepts = num_concepts
+        self.concept_groups = concept_groups
+        # LoRA parameters
+        self.lora_rank = lora_rank
+        self.lora_alpha = lora_alpha
+        self.lora_dropout = lora_dropout
 
 class MultiHeadAttention(nn.Module):
     """Multi-head attention mechanism with structural awareness"""
@@ -202,11 +217,11 @@ class ProteinGenerativeLayer(nn.Module):
         return outputs
 
 class ProteinGenerativeModel(PreTrainedModel):
-    """Main protein generative model with structural awareness"""
+    """Main protein generative model with structural awareness and concept bottleneck"""
     def __init__(self, config: ProteinGenerativeConfig):
         super().__init__(config)
         self.config = config
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.register_buffer("_device_buffer", torch.zeros(1), persistent=False)
 
         # Initialize embeddings with proper padding
         self.embeddings = nn.Embedding(
@@ -233,10 +248,35 @@ class ProteinGenerativeModel(PreTrainedModel):
         # Gradient checkpointing for memory efficiency
         self.gradient_checkpointing = True
 
-        # Transformer layers with structural awareness
-        self.layers = nn.ModuleList(
-            [ProteinGenerativeLayer(config) for _ in range(config.num_hidden_layers)]
+        # Split layers into encoder and decoder with concept bottleneck
+        num_encoder_layers = config.num_hidden_layers // 2
+        num_decoder_layers = config.num_hidden_layers - num_encoder_layers
+
+        # Encoder layers
+        self.encoder_layers = nn.ModuleList([
+            ProteinGenerativeLayer(config) for _ in range(num_encoder_layers)
+        ])
+
+        # Concept bottleneck layer
+        self.concept_bottleneck = ConceptBottleneckLayer(
+            hidden_size=config.hidden_size,
+            num_concepts=config.num_concepts,
+            concept_groups=config.concept_groups,
+            dropout_prob=config.hidden_dropout_prob
         )
+
+        # Decoder layers with LoRA optimization
+        self.decoder_layers = nn.ModuleList([
+            nn.ModuleDict({
+                'base': ProteinGenerativeLayer(config),
+                'lora': LoRALayer(
+                    hidden_size=config.hidden_size,
+                    lora_rank=config.lora_rank,
+                    lora_alpha=config.lora_alpha,
+                    lora_dropout=config.lora_dropout
+                )
+            }) for _ in range(num_decoder_layers)
+        ])
 
         # Enhanced normalization and regularization
         self.layernorm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
@@ -282,38 +322,21 @@ class ProteinGenerativeModel(PreTrainedModel):
         # Initialize weights
         self.init_weights()
 
-        self.layers = nn.ModuleList(
-            [ProteinGenerativeLayer(config) for _ in range(config.num_hidden_layers)]
-        )
+        # Track concept interpretations
+        self.concept_activations = {}
 
-        self.layernorm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
-        self.dropout = nn.Dropout(config.hidden_dropout_prob)
+    @property
+    def device(self) -> torch.device:
+        return self._device_buffer.device
 
-        # Initialize output projection for token prediction
-        self.output_projection = nn.Linear(config.hidden_size, config.vocab_size)
-
-        # Add amino acid mappings
-        self.aa_to_idx = {
-            'A': 0, 'C': 1, 'D': 2, 'E': 3, 'F': 4,
-            'G': 5, 'H': 6, 'I': 7, 'K': 8, 'L': 9,
-            'M': 10, 'N': 11, 'P': 12, 'Q': 13, 'R': 14,
-            'S': 15, 'T': 16, 'V': 17, 'W': 18, 'Y': 19,
-        }
-        self.idx_to_aa = {v: k for k, v in self.aa_to_idx.items()}
-
-        # Initialize weights
-        self.init_weights()
+    def to(self, device: torch.device) -> 'ProteinGenerativeModel':
+        return super().to(device)
 
     def get_input_embeddings(self) -> nn.Module:
         return self.embeddings
 
     def set_input_embeddings(self, value: nn.Module):
         self.embeddings = value
-
-    def _prune_heads(self, heads_to_prune: Dict[int, List[int]]):
-        """Prunes heads of the model"""
-        for layer, heads in heads_to_prune.items():
-            self.layers[layer].attention.prune_heads(heads)
 
     def forward(
         self,
@@ -324,8 +347,9 @@ class ProteinGenerativeModel(PreTrainedModel):
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
+        return_concepts: Optional[bool] = False,
     ) -> Dict[str, torch.Tensor]:
-        """Forward pass with structural awareness and validation"""
+        """Forward pass with structural awareness, concept bottleneck, and LoRA optimization"""
         batch_size, seq_length = input_ids.size()
         device = input_ids.device
 
@@ -367,9 +391,10 @@ class ProteinGenerativeModel(PreTrainedModel):
         all_hidden_states = () if output_hidden_states else None
         all_attentions = () if output_attentions else None
         all_structural_angles = []
+        concept_outputs = {} if return_concepts else None
 
-        # Apply transformer layers with gradient checkpointing
-        for i, layer in enumerate(self.layers):
+        # Encoder layers
+        for i, layer in enumerate(self.encoder_layers):
             if output_hidden_states:
                 all_hidden_states = all_hidden_states + (hidden_states,)
 
@@ -395,7 +420,53 @@ class ProteinGenerativeModel(PreTrainedModel):
 
             hidden_states = layer_outputs[0]
 
-            # Structural validation after each layer
+            # Structural validation after encoder layer
+            structural_angles = self.structure_validator(hidden_states)
+            all_structural_angles.append(structural_angles)
+
+            if output_attentions:
+                all_attentions = all_attentions + (layer_outputs[1],)
+
+        # Apply concept bottleneck between encoder and decoder
+        hidden_states, concept_acts = self.concept_bottleneck(
+            hidden_states,
+            return_concepts=return_concepts
+        )
+        if return_concepts:
+            concept_outputs.update(concept_acts)
+
+        # Decoder layers with LoRA optimization
+        for i, layer_dict in enumerate(self.decoder_layers):
+            if output_hidden_states:
+                all_hidden_states = all_hidden_states + (hidden_states,)
+
+            # Apply base decoder layer
+            if self.gradient_checkpointing and self.training:
+                def create_custom_forward(module):
+                    def custom_forward(*inputs):
+                        return module(*inputs)
+                    return custom_forward
+
+                layer_outputs = torch.utils.checkpoint.checkpoint(
+                    create_custom_forward(layer_dict['base']),
+                    hidden_states,
+                    attention_mask,
+                    output_attentions,
+                )
+            else:
+                layer_outputs = layer_dict['base'](
+                    hidden_states,
+                    attention_mask=attention_mask,
+                    output_attentions=output_attentions,
+                )
+
+            hidden_states = layer_outputs[0]
+
+            # Apply LoRA optimization
+            lora_output = layer_dict['lora'](hidden_states)
+            hidden_states = hidden_states + lora_output
+
+            # Structural validation after decoder layer
             structural_angles = self.structure_validator(hidden_states)
             all_structural_angles.append(structural_angles)
 
@@ -405,13 +476,18 @@ class ProteinGenerativeModel(PreTrainedModel):
         # Get logits
         logits = self.output_projection(hidden_states)
 
-        return {
+        # Prepare outputs
+        outputs = {
             'last_hidden_state': hidden_states,
             'logits': logits,
             'hidden_states': all_hidden_states,
             'attentions': all_attentions,
             'structural_angles': torch.stack(all_structural_angles, dim=1),
         }
+        if return_concepts:
+            outputs['concepts'] = concept_outputs
+
+        return outputs
 
     def generate(
         self,
@@ -424,9 +500,11 @@ class ProteinGenerativeModel(PreTrainedModel):
         repetition_penalty: float = 1.0,
         template_sequence: Optional[str] = None,
         structural_guidance: bool = True,
+        concept_guidance: bool = True,
+        target_concepts: Optional[Dict[str, float]] = None,
         batch_size: int = 4,
     ) -> List[str]:
-        """Generate protein sequences with advanced sampling and structural guidance.
+        """Generate protein sequences with concept guidance and structural validation.
 
         Args:
             prompt_text: Text description of desired protein
@@ -437,7 +515,9 @@ class ProteinGenerativeModel(PreTrainedModel):
             top_p: Nucleus sampling parameter
             repetition_penalty: Penalty for repeated tokens
             template_sequence: Optional template sequence for guided generation
-            structural_guidance: Whether to use structural validation feedback
+            structural_guidance: Whether to use structural validation
+            concept_guidance: Whether to use concept bottleneck guidance
+            target_concepts: Optional target concept activations
             batch_size: Batch size for parallel generation
         """
         device = next(self.parameters()).device
@@ -465,11 +545,12 @@ class ProteinGenerativeModel(PreTrainedModel):
             batch_sequences = batch_input_ids.clone()
 
             while current_length < max_length:
-                # Get model predictions
+                # Get model predictions with concept interpretations
                 outputs = self.forward(
                     input_ids=batch_sequences,
                     output_attentions=True,
                     output_hidden_states=True,
+                    return_concepts=concept_guidance
                 )
 
                 next_token_logits = outputs["logits"][:, -1, :]
@@ -502,6 +583,14 @@ class ProteinGenerativeModel(PreTrainedModel):
                     structural_scores = self._evaluate_structural_validity(outputs["structural_angles"])
                     next_token_logits += structural_scores.unsqueeze(-1)
 
+                # Apply concept guidance if enabled
+                if concept_guidance and "concepts" in outputs:
+                    concept_scores = self._evaluate_concept_alignment(
+                        outputs["concepts"],
+                        target_concepts
+                    )
+                    next_token_logits += concept_scores.unsqueeze(-1)
+
                 # Apply template guidance if provided
                 if template_embeddings is not None:
                     template_scores = self._compute_template_similarity(
@@ -531,30 +620,74 @@ class ProteinGenerativeModel(PreTrainedModel):
         return all_sequences[:num_return_sequences]
 
     def _evaluate_structural_validity(self, structural_angles: torch.Tensor) -> torch.Tensor:
-        """Evaluate structural validity of generated angles."""
-        # Implement Ramachandran plot validation
-        phi, psi, omega = structural_angles[..., 0], structural_angles[..., 1], structural_angles[..., 2]
+        """Evaluate structural validity of generated angles"""
+        # Ensure angles are on correct device
+        structural_angles = structural_angles.to(self.device)
 
-        # Check if angles are within allowed regions
-        valid_phi = (-180 <= phi) & (phi <= 180)
-        valid_psi = (-180 <= psi) & (psi <= 180)
-        valid_omega = (-180 <= omega) & (omega <= 180)
+        # Convert angles to radians
+        angles_rad = structural_angles * math.pi / 180.0
 
-        # Combine validations and convert to score
-        validity_score = (valid_phi & valid_psi & valid_omega).float()
-        return validity_score
+        # Check Ramachandran plot constraints
+        phi = angles_rad[..., 0]
+        psi = angles_rad[..., 1]
+        omega = angles_rad[..., 2]
+
+        # Score based on allowed regions in Ramachandran plot
+        allowed_score = torch.where(
+            (phi >= -math.pi/3) & (phi <= math.pi/3) &
+            (psi >= -math.pi/3) & (psi <= math.pi/3),
+            torch.ones_like(phi, device=self.device),
+            torch.zeros_like(phi, device=self.device)
+        )
+
+        # Score planarity of peptide bond
+        planarity_score = torch.cos(omega - math.pi)
+
+        return (allowed_score + planarity_score) / 2.0
+
+    def _evaluate_concept_alignment(
+        self,
+        current_concepts: Dict[str, torch.Tensor],
+        target_concepts: Optional[Dict[str, float]] = None
+    ) -> torch.Tensor:
+        """Evaluate alignment between current and target concepts"""
+        if target_concepts is None:
+            return torch.zeros(
+                current_concepts[list(current_concepts.keys())[0]].size(0),
+                device=self.device
+            )
+
+        alignment_scores = []
+        for concept_type, target_value in target_concepts.items():
+            if concept_type in current_concepts:
+                current_value = current_concepts[concept_type].to(self.device)
+                target_tensor = torch.tensor(target_value, device=self.device)
+                # Calculate similarity between current and target concept values
+                diff = torch.abs(current_value - target_tensor)
+                alignment_score = 1.0 - diff.mean(dim=-1)
+                alignment_scores.append(alignment_score)
+
+        if not alignment_scores:
+            return torch.zeros(
+                current_concepts[list(current_concepts.keys())[0]].size(0),
+                device=self.device
+            )
+
+        return torch.stack(alignment_scores).mean(dim=0)
 
     def _compute_template_similarity(
         self,
         hidden_states: torch.Tensor,
         template_embeddings: torch.Tensor,
-        current_position: int
+        current_length: int
     ) -> torch.Tensor:
-        """Compute similarity scores between generated sequences and template."""
-        # Get relevant embeddings for current position
-        current_embeddings = hidden_states[:, -1, :]
-        template_pos_embeddings = template_embeddings[:, current_position, :]
+        """Compute similarity between current hidden states and template"""
+        template_length = template_embeddings.size(1)
+        if current_length >= template_length:
+            return torch.zeros(hidden_states.size(0), device=hidden_states.device)
 
-        # Compute cosine similarity
-        similarity = torch.cosine_similarity(current_embeddings, template_pos_embeddings, dim=-1)
+        current_embeddings = hidden_states[:, -1, :]
+        template_embedding = template_embeddings[:, current_length, :]
+
+        similarity = torch.cosine_similarity(current_embeddings, template_embedding, dim=-1)
         return similarity
