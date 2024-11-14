@@ -8,7 +8,7 @@ import torch.nn as nn
 from typing import Dict, List, Optional, Tuple
 import numpy as np
 from transformers import AutoModel
-from Bio import Gene
+from Bio.Data import IUPACData  # Replace with correct Biopython import
 
 class FunctionPredictor(nn.Module):
     def __init__(self, config: Dict):
