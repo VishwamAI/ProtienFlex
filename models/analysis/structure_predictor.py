@@ -85,16 +85,15 @@ class ContactMapPredictor(nn.Module):
 
         # Generate contact map
         batch_size, seq_len, _ = features.shape
-        contacts = []
+        contacts = torch.zeros(batch_size, seq_len, seq_len)
 
         for i in range(seq_len):
             # Use only the relevant features for each position
             pair_features = attn_output[:, i]  # Only use features from position i
             contact_prob = self.mlp(pair_features)
-            contacts.append(contact_prob)
+            contacts[:, i, :] = contact_prob.view(batch_size, -1)
 
-        contact_map = torch.stack(contacts, dim=1).view(batch_size, seq_len, seq_len)
-        return contact_map
+        return contacts
 
 class StructureRefiner(nn.Module):
     def __init__(self):
