@@ -141,6 +141,14 @@ class UnifiedPredictor(nn.Module):
             nn.Dropout(0.1)
         )
 
+        # Transform structure features to match sequence dimensions
+        self.structure_encoder = nn.Sequential(
+            nn.Linear(3, 768),     # Transform structure features to match dimensions
+            nn.LayerNorm(768),     # Normalize features
+            nn.ReLU(),
+            nn.Dropout(0.1)
+        )
+
         self.integration_network = nn.Sequential(
             nn.Linear(768 * 3, 1536),  # Concatenated features from all three modalities
             nn.LayerNorm(1536),        # Normalize combined features
@@ -170,6 +178,10 @@ class UnifiedPredictor(nn.Module):
         # Transform function features to match dimensions
         function_features = self.function_encoder(function_results['go_terms'])
         print(f"Transformed function features shape: {function_features.shape}")
+
+        # Transform structure features to match sequence dimensions
+        structure_features = self.structure_encoder(structure_features)
+        print(f"Transformed structure features shape: {structure_features.shape}")
 
         # Ensure all features have the same dimensions before combining
         batch_size = sequence_features.size(0)
