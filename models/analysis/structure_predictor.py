@@ -16,7 +16,7 @@ class StructurePredictor(nn.Module):
         if config is None:
             config = {}
 
-        hidden_size = config.get('hidden_size', 768)  # Match ESM2 dimensions
+        hidden_size = config.get('hidden_size', 320)  # Match ESM2 dimensions
 
         # Initialize backbone prediction network
         self.backbone_network = nn.Sequential(
@@ -43,10 +43,10 @@ class StructurePredictor(nn.Module):
     def forward(self, sequence_features: torch.Tensor) -> Dict[str, torch.Tensor]:
         """Forward pass for structure prediction"""
         # Predict backbone features
-        backbone_features = self.backbone_network(sequence_features)  # [batch, seq_len, 768]
+        backbone_features = self.backbone_network(sequence_features)  # [batch, seq_len, 320]
 
         # Predict side chain features
-        side_chain_features = self.side_chain_network(backbone_features)  # [batch, seq_len, 768]
+        side_chain_features = self.side_chain_network(backbone_features)  # [batch, seq_len, 320]
 
         # Predict contact map
         contact_map = self.contact_predictor(sequence_features)  # [batch, seq_len, seq_len]
@@ -72,11 +72,11 @@ class StructurePredictor(nn.Module):
 class ContactMapPredictor(nn.Module):
     def __init__(self):
         super().__init__()
-        self.attention = nn.MultiheadAttention(768, num_heads=8)  # Match ESM2 dimensions
+        self.attention = nn.MultiheadAttention(320, num_heads=8)  # Match ESM2 dimensions
         self.mlp = nn.Sequential(
-            nn.Linear(768, 384),  # Input from attention
+            nn.Linear(320, 160),  # Input from attention
             nn.ReLU(),
-            nn.Linear(384, 1)  # Output single contact probability
+            nn.Linear(160, 1)  # Output single contact probability
         )
 
     def forward(self, features: torch.Tensor) -> torch.Tensor:
@@ -101,17 +101,17 @@ class StructureRefiner(nn.Module):
         super().__init__()
         # Feature processing networks
         self.backbone_processor = nn.Sequential(
-            nn.Linear(768, 384),
+            nn.Linear(320, 160),
             nn.ReLU(),
             nn.Dropout(0.1),
-            nn.Linear(384, 3)  # Output (phi, psi, omega) angles
+            nn.Linear(160, 3)  # Output (phi, psi, omega) angles
         )
 
         self.side_chain_processor = nn.Sequential(
-            nn.Linear(768, 384),
+            nn.Linear(320, 160),
             nn.ReLU(),
             nn.Dropout(0.1),
-            nn.Linear(384, 4)  # Output chi angles
+            nn.Linear(160, 4)  # Output chi angles
         )
 
     def forward(self, backbone_features: torch.Tensor,
