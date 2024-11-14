@@ -135,9 +135,10 @@ class UnifiedPredictor(nn.Module):
 
         # Transform function results to match feature dimensions
         self.function_encoder = nn.Sequential(
-            nn.Linear(768, 768),  # Maintain ESM2 dimensions
+            nn.Linear(1000, 768),  # Transform GO terms to match feature dimensions
+            nn.LayerNorm(768),     # Normalize features
             nn.ReLU(),
-            nn.Linear(768, 768)  # Match ESM2 dimensions
+            nn.Dropout(0.1)
         )
 
         self.integration_network = nn.Sequential(
