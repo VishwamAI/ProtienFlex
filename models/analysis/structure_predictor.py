@@ -118,15 +118,17 @@ class StructureRefiner(nn.Module):
                 side_chain_features: torch.Tensor,
                 contact_map: torch.Tensor) -> torch.Tensor:
         """Refine protein structure using predicted features"""
-        # Process backbone and side chain features into angles
-        backbone_angles = self.backbone_processor(backbone_features)
-        side_chain_angles = self.side_chain_processor(side_chain_features)
+        # Process backbone and side chain features into initial structure
+        batch_size = backbone_features.size(0)
+        seq_len = backbone_features.size(1)
 
-        # Apply contact map constraints
+        # Initialize structure with zeros
+        initial_structure = torch.zeros(batch_size, seq_len, 3, device=backbone_features.device)
+
+        # Apply contact map constraints and refine structure
         refined_structure = self._apply_contact_constraints(
-            backbone_angles, side_chain_angles, contact_map
+            initial_structure, contact_map, backbone_features, side_chain_features
         )
-
         return refined_structure
 
     def _apply_contact_constraints(
