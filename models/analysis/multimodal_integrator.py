@@ -157,6 +157,7 @@ class UnifiedPredictor(nn.Module):
             nn.Linear(1536, 768)       # Final output dimension
         )
 
+        # Global average pooling followed by confidence estimation
         self.confidence_estimator = nn.Sequential(
             nn.Linear(768, 384),
             nn.ReLU(),
@@ -210,8 +211,13 @@ class UnifiedPredictor(nn.Module):
         unified_features = self.integration_network(combined_features)
         print(f"Unified features shape: {unified_features.shape}")
 
-        # Estimate confidence
-        confidence = self.confidence_estimator(unified_features)
+        # Global average pooling for confidence estimation
+        pooled_features = torch.mean(unified_features, dim=1)  # Average across sequence length
+        print(f"Pooled features shape: {pooled_features.shape}")
+
+        # Estimate confidence (single value per protein)
+        confidence = self.confidence_estimator(pooled_features)
+        print(f"Confidence shape: {confidence.shape}")
 
         return {
             'unified_features': unified_features,
