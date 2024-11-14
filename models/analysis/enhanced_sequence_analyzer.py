@@ -15,34 +15,44 @@ class EnhancedSequenceAnalyzer(nn.Module):
     def __init__(self, config: Dict):
         super().__init__()
         self.config = config
-        self.hidden_size = 768  # ESM2's actual output dimension
+        self.esm2_size = 320    # ESM2's actual output dimension
+        self.hidden_size = 768  # Target dimension for processing
 
         # Initialize protein language model
         self.tokenizer = AutoTokenizer.from_pretrained('facebook/esm2_t6_8M_UR50D')
         self.protein_model = AutoModel.from_pretrained('facebook/esm2_t6_8M_UR50D')
 
-        # Feature extraction layers - maintain ESM2 dimensions
+        # Dimension transformation layer for ESM2 output
+        self.dim_transform = nn.Sequential(
+            nn.Linear(self.esm2_size, 512),  # First expand
+            nn.LayerNorm(512),               # Normalize
+            nn.ReLU(),
+            nn.Linear(512, self.hidden_size), # Then to target dimension
+            nn.LayerNorm(self.hidden_size)    # Final normalization
+        )
+
+        # Feature extraction layers
         self.feature_extractor = nn.Sequential(
-            nn.Linear(768, 768),
+            nn.Linear(self.hidden_size, self.hidden_size),
             nn.ReLU(),
             nn.Dropout(0.1),
-            nn.Linear(768, 768),
+            nn.Linear(self.hidden_size, self.hidden_size),
             nn.ReLU(),
             nn.Dropout(0.1)
         )
 
-        # Pattern recognition module - maintain ESM2 dimensions
+        # Pattern recognition module
         self.pattern_recognition = nn.Sequential(
-            nn.Linear(768, 768),
+            nn.Linear(self.hidden_size, self.hidden_size),
             nn.ReLU(),
-            nn.Linear(768, 768)
+            nn.Linear(self.hidden_size, self.hidden_size)
         )
 
         # Conservation analysis module
         self.conservation_analyzer = ConservationAnalyzer()
 
-        # Motif identification module - updated input size
-        self.motif_identifier = MotifIdentifier(768)
+        # Motif identification module
+        self.motif_identifier = MotifIdentifier(self.hidden_size)
 
     def forward(self, sequences: List[str]) -> Dict[str, torch.Tensor]:
         # Tokenize sequences
@@ -52,6 +62,15 @@ class EnhancedSequenceAnalyzer(nn.Module):
         with torch.no_grad():
             protein_features = self.protein_model(**encoded).last_hidden_state.clone()
         protein_features.requires_grad = True
+
+        # Validate input dimensions
+        assert protein_features.size(-1) == self.esm2_size, f"Expected ESM2 output dimension {self.esm2_size}, got {protein_features.size(-1)}"
+
+        # Transform dimensions to match target size
+        protein_features = self.dim_transform(protein_features)
+
+        # Validate transformed dimensions
+        assert protein_features.size(-1) == self.hidden_size, f"Expected transformed dimension {self.hidden_size}, got {protein_features.size(-1)}"
 
         # Extract features
         features = self.feature_extractor(protein_features)
