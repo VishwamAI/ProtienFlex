@@ -23,27 +23,27 @@ class EnhancedSequenceAnalyzer(nn.Module):
 
         # Feature extraction layers
         self.feature_extractor = nn.Sequential(
-            nn.Linear(self.hidden_size, self.hidden_size),
+            nn.Linear(320, 320),  # Match ESM2 output dimension
             nn.ReLU(),
             nn.Dropout(0.1),
-            nn.Linear(self.hidden_size, self.hidden_size // 2),
+            nn.Linear(320, 160),  # Half the dimension
             nn.ReLU(),
             nn.Dropout(0.1),
-            nn.Linear(self.hidden_size // 2, self.hidden_size // 4)
+            nn.Linear(160, 80)  # Quarter the dimension
         )
 
         # Pattern recognition module
         self.pattern_recognition = nn.Sequential(
-            nn.Linear(self.hidden_size // 4, self.hidden_size // 8),
+            nn.Linear(80, 40),  # Input from feature extractor output
             nn.ReLU(),
-            nn.Linear(self.hidden_size // 8, self.hidden_size // 16)
+            nn.Linear(40, 20)  # Reduced dimension for motif identification
         )
 
         # Conservation analysis module
         self.conservation_analyzer = ConservationAnalyzer()
 
         # Motif identification module
-        self.motif_identifier = MotifIdentifier(self.hidden_size // 16)
+        self.motif_identifier = MotifIdentifier(20)
 
     def forward(self, sequences: List[str]) -> Dict[str, torch.Tensor]:
         # Tokenize sequences
