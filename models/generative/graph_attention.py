@@ -31,9 +31,9 @@ class GraphAttentionLayer(nn.Module):
         self.value = nn.Linear(hidden_size, self.all_head_size)
 
         # Structure-aware components
-        self.distance_embedding = nn.Linear(1, self.attention_head_size)
-        self.angle_embedding = nn.Linear(1, self.attention_head_size)
-
+        self.distance_embedding = nn.Linear(1, 1)
+        self.angle_embedding = nn.Linear(1, 1)
+        
         # Output
         self.output = nn.Linear(hidden_size, hidden_size)
 
@@ -81,19 +81,38 @@ class GraphAttentionLayer(nn.Module):
 
         # Add structure awareness if available
         if distance_matrix is not None:
+            # Get distance embeddings [batch_size, seq_length, seq_length, 1]
             distance_embeddings = self.distance_embedding(distance_matrix.unsqueeze(-1))
-            attention_scores = attention_scores + torch.matmul(
-                query_layer, distance_embeddings.transpose(-1, -2)
-            )
+            
+            # Project embeddings to attention head size
+            batch_size, seq_len_i, seq_len_j, embed_dim = distance_embeddings.size()
+            
+            # Reshape to match attention scores: [batch_size, num_heads, seq_len, seq_len]
+            distance_scores = distance_embeddings.squeeze(-1)  # Remove last dimension
+            distance_scores = distance_scores.unsqueeze(1)     # Add head dimension
+            distance_scores = distance_scores.expand(-1, self.num_attention_heads, -1, -1)
+            
+            # Add to attention scores
+            attention_scores = attention_scores + distance_scores
 
         if angle_matrix is not None:
+            # Get angle embeddings [batch_size, seq_length, seq_length, 1]
             angle_embeddings = self.angle_embedding(angle_matrix.unsqueeze(-1))
-            attention_scores = attention_scores + torch.matmul(
-                query_layer, angle_embeddings.transpose(-1, -2)
-            )
+            
+            # Remove last dimension
+            angle_scores = angle_embeddings.squeeze(-1)  # [batch_size, seq_len, seq_len]
+            
+            # Add head dimension and expand
+            angle_scores = angle_scores.unsqueeze(1)  # [batch_size, 1, seq_len, seq_len]
+            angle_scores = angle_scores.expand(-1, self.num_attention_heads, -1, -1)
+            
+            # Add to attention scores
+            attention_scores = attention_scores + angle_scores
 
-        # Apply attention mask if provided
+        # Before applying the attention mask, reshape it to match attention_scores dimensions
         if attention_mask is not None:
+            # Reshape attention_mask from [batch_size, seq_length] to [batch_size, 1, 1, seq_length]
+            attention_mask = attention_mask.unsqueeze(1).unsqueeze(2)
             attention_scores = attention_scores + (1.0 - attention_mask) * -10000.0
 
         # Normalize attention scores

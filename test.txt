@@ -2,15 +2,14 @@
 platform linux -- Python 3.10.12, pytest-8.3.4, pluggy-1.5.0
 rootdir: /home/kasinadhsarma/Pictures/ProtienFlex
 configfile: pyproject.toml
-testpaths: tests
 plugins: cov-6.0.0, anyio-4.7.0
 collected 136 items
 
 tests/analysis/test_multimodal_integration.py ......                     [  4%]
 tests/generative/test_concept_bottleneck.py ......                       [  8%]
-tests/generative/test_graph_attention.py F...F                           [ 12%]
-tests/generative/test_protein_generator.py FFFFF                         [ 16%]
-tests/generative/test_structure_generator.py .F..FF                      [ 20%]
+tests/generative/test_graph_attention.py .....                           [ 12%]
+tests/generative/test_protein_generator.py .....                         [ 16%]
+tests/generative/test_structure_generator.py .F...F                      [ 20%]
 tests/integration/test_optimization_pipeline.py EEEEEEEEEEE              [ 28%]
 tests/integration/test_performance_benchmarks.py EEEEEEE                 [ 33%]
 tests/integration/test_protein_validation.py EEEEEEEE                    [ 39%]
@@ -30,7 +29,7 @@ WARNING: Failed to generate report: No data to report.
 ==================================== ERRORS ====================================
 ____________ ERROR at setup of test_complete_optimization_pipeline _____________
 
-temp_log_dir = '/tmp/tmpm_erbip4'
+temp_log_dir = '/tmp/tmp5wjq4uss'
 
     @pytest.fixture
     def optimization_components(temp_log_dir):
@@ -52,7 +51,7 @@ models/optimizers/adaptive_processor.py:24: in __init__
     self.hardware_info = self._detect_hardware()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x79ac40197a30>
+self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x7ea4b99a6770>
 
     def _detect_hardware(self) -> Dict[str, Union[str, int]]:
         """Detect available hardware and capabilities."""
@@ -73,7 +72,7 @@ E           AttributeError: 'torch._C._CudaDeviceProperties' object has no attri
 models/optimizers/adaptive_processor.py:52: AttributeError
 __________________ ERROR at setup of test_pipeline_adaptation __________________
 
-temp_log_dir = '/tmp/tmpp3x6xl0n'
+temp_log_dir = '/tmp/tmps3qe1lsi'
 
     @pytest.fixture
     def optimization_components(temp_log_dir):
@@ -95,7 +94,7 @@ models/optimizers/adaptive_processor.py:24: in __init__
     self.hardware_info = self._detect_hardware()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x79ac40168370>
+self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x7ea4ba477940>
 
     def _detect_hardware(self) -> Dict[str, Union[str, int]]:
         """Detect available hardware and capabilities."""
@@ -116,7 +115,7 @@ E           AttributeError: 'torch._C._CudaDeviceProperties' object has no attri
 models/optimizers/adaptive_processor.py:52: AttributeError
 ______________ ERROR at setup of test_pipeline_memory_efficiency _______________
 
-temp_log_dir = '/tmp/tmphgzk0hqu'
+temp_log_dir = '/tmp/tmptqj2x1jb'
 
     @pytest.fixture
     def optimization_components(temp_log_dir):
@@ -138,7 +137,7 @@ models/optimizers/adaptive_processor.py:24: in __init__
     self.hardware_info = self._detect_hardware()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x79ac401bfcd0>
+self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x7ea4ba4a7af0>
 
     def _detect_hardware(self) -> Dict[str, Union[str, int]]:
         """Detect available hardware and capabilities."""
@@ -159,7 +158,7 @@ E           AttributeError: 'torch._C._CudaDeviceProperties' object has no attri
 models/optimizers/adaptive_processor.py:52: AttributeError
 _____________ ERROR at setup of test_pipeline_performance_tracking _____________
 
-temp_log_dir = '/tmp/tmphgudsp7s'
+temp_log_dir = '/tmp/tmpj4lp8vqz'
 
     @pytest.fixture
     def optimization_components(temp_log_dir):
@@ -181,7 +180,7 @@ models/optimizers/adaptive_processor.py:24: in __init__
     self.hardware_info = self._detect_hardware()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x79ac4054d900>
+self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x7ea4b9f03610>
 
     def _detect_hardware(self) -> Dict[str, Union[str, int]]:
         """Detect available hardware and capabilities."""
@@ -202,7 +201,7 @@ E           AttributeError: 'torch._C._CudaDeviceProperties' object has no attri
 models/optimizers/adaptive_processor.py:52: AttributeError
 ________________ ERROR at setup of test_pipeline_error_handling ________________
 
-temp_log_dir = '/tmp/tmpxl0qkpxi'
+temp_log_dir = '/tmp/tmpyviatbjg'
 
     @pytest.fixture
     def optimization_components(temp_log_dir):
@@ -224,7 +223,7 @@ models/optimizers/adaptive_processor.py:24: in __init__
     self.hardware_info = self._detect_hardware()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x79ac40fecd90>
+self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x7ea4b98649d0>
 
     def _detect_hardware(self) -> Dict[str, Union[str, int]]:
         """Detect available hardware and capabilities."""
@@ -245,7 +244,7 @@ E           AttributeError: 'torch._C._CudaDeviceProperties' object has no attri
 models/optimizers/adaptive_processor.py:52: AttributeError
 ___________ ERROR at setup of test_pipeline_different_batch_sizes[8] ___________
 
-temp_log_dir = '/tmp/tmppbsvridw'
+temp_log_dir = '/tmp/tmpbnih581v'
 
     @pytest.fixture
     def optimization_components(temp_log_dir):
@@ -267,7 +266,7 @@ models/optimizers/adaptive_processor.py:24: in __init__
     self.hardware_info = self._detect_hardware()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x79ac40002d10>
+self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x7ea4b97b8190>
 
     def _detect_hardware(self) -> Dict[str, Union[str, int]]:
         """Detect available hardware and capabilities."""
@@ -288,7 +287,7 @@ E           AttributeError: 'torch._C._CudaDeviceProperties' object has no attri
 models/optimizers/adaptive_processor.py:52: AttributeError
 __________ ERROR at setup of test_pipeline_different_batch_sizes[16] ___________
 
-temp_log_dir = '/tmp/tmp9591njrd'
+temp_log_dir = '/tmp/tmpjvrlwane'
 
     @pytest.fixture
     def optimization_components(temp_log_dir):
@@ -310,7 +309,7 @@ models/optimizers/adaptive_processor.py:24: in __init__
     self.hardware_info = self._detect_hardware()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x79ac401ec250>
+self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x7ea4b98d0cd0>
 
     def _detect_hardware(self) -> Dict[str, Union[str, int]]:
         """Detect available hardware and capabilities."""
@@ -331,7 +330,7 @@ E           AttributeError: 'torch._C._CudaDeviceProperties' object has no attri
 models/optimizers/adaptive_processor.py:52: AttributeError
 __________ ERROR at setup of test_pipeline_different_batch_sizes[32] ___________
 
-temp_log_dir = '/tmp/tmpc9w6epzk'
+temp_log_dir = '/tmp/tmpb57rkwni'
 
     @pytest.fixture
     def optimization_components(temp_log_dir):
@@ -353,7 +352,7 @@ models/optimizers/adaptive_processor.py:24: in __init__
     self.hardware_info = self._detect_hardware()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x79ac41941c30>
+self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x7ea4b9fc83a0>
 
     def _detect_hardware(self) -> Dict[str, Union[str, int]]:
         """Detect available hardware and capabilities."""
@@ -374,7 +373,7 @@ E           AttributeError: 'torch._C._CudaDeviceProperties' object has no attri
 models/optimizers/adaptive_processor.py:52: AttributeError
 ________ ERROR at setup of test_pipeline_different_sequence_lengths[10] ________
 
-temp_log_dir = '/tmp/tmpv2bbpni5'
+temp_log_dir = '/tmp/tmpisl0ertk'
 
     @pytest.fixture
     def optimization_components(temp_log_dir):
@@ -396,7 +395,7 @@ models/optimizers/adaptive_processor.py:24: in __init__
     self.hardware_info = self._detect_hardware()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x79ac401be8f0>
+self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x7ea4ba4a66b0>
 
     def _detect_hardware(self) -> Dict[str, Union[str, int]]:
         """Detect available hardware and capabilities."""
@@ -417,7 +416,7 @@ E           AttributeError: 'torch._C._CudaDeviceProperties' object has no attri
 models/optimizers/adaptive_processor.py:52: AttributeError
 ________ ERROR at setup of test_pipeline_different_sequence_lengths[20] ________
 
-temp_log_dir = '/tmp/tmp_clne0an'
+temp_log_dir = '/tmp/tmpzx1ynxti'
 
     @pytest.fixture
     def optimization_components(temp_log_dir):
@@ -439,7 +438,7 @@ models/optimizers/adaptive_processor.py:24: in __init__
     self.hardware_info = self._detect_hardware()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x79ac40f65900>
+self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x7ea4b98d1510>
 
     def _detect_hardware(self) -> Dict[str, Union[str, int]]:
         """Detect available hardware and capabilities."""
@@ -460,7 +459,7 @@ E           AttributeError: 'torch._C._CudaDeviceProperties' object has no attri
 models/optimizers/adaptive_processor.py:52: AttributeError
 ________ ERROR at setup of test_pipeline_different_sequence_lengths[30] ________
 
-temp_log_dir = '/tmp/tmpwwf6x8gg'
+temp_log_dir = '/tmp/tmp5gf0rzoj'
 
     @pytest.fixture
     def optimization_components(temp_log_dir):
@@ -482,7 +481,7 @@ models/optimizers/adaptive_processor.py:24: in __init__
     self.hardware_info = self._detect_hardware()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x79ac41943490>
+self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x7ea4b985f7c0>
 
     def _detect_hardware(self) -> Dict[str, Union[str, int]]:
         """Detect available hardware and capabilities."""
@@ -522,7 +521,7 @@ models/optimizers/adaptive_processor.py:24: in __init__
     self.hardware_info = self._detect_hardware()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x79ac401be860>
+self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x7ea4b97b96c0>
 
     def _detect_hardware(self) -> Dict[str, Union[str, int]]:
         """Detect available hardware and capabilities."""
@@ -562,7 +561,7 @@ models/optimizers/adaptive_processor.py:24: in __init__
     self.hardware_info = self._detect_hardware()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x79ac40f657e0>
+self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x7ea4b98d1690>
 
     def _detect_hardware(self) -> Dict[str, Union[str, int]]:
         """Detect available hardware and capabilities."""
@@ -602,7 +601,7 @@ models/optimizers/adaptive_processor.py:24: in __init__
     self.hardware_info = self._detect_hardware()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x79ac40518eb0>
+self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x7ea4b985fb80>
 
     def _detect_hardware(self) -> Dict[str, Union[str, int]]:
         """Detect available hardware and capabilities."""
@@ -642,7 +641,7 @@ models/optimizers/adaptive_processor.py:24: in __init__
     self.hardware_info = self._detect_hardware()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x79ac4021a050>
+self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x7ea4b97b8250>
 
     def _detect_hardware(self) -> Dict[str, Union[str, int]]:
         """Detect available hardware and capabilities."""
@@ -682,7 +681,7 @@ models/optimizers/adaptive_processor.py:24: in __init__
     self.hardware_info = self._detect_hardware()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x79ac40169030>
+self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x7ea4b9860a60>
 
     def _detect_hardware(self) -> Dict[str, Union[str, int]]:
         """Detect available hardware and capabilities."""
@@ -722,7 +721,7 @@ models/optimizers/adaptive_processor.py:24: in __init__
     self.hardware_info = self._detect_hardware()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x79ac401a4310>
+self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x7ea4ba4c40a0>
 
     def _detect_hardware(self) -> Dict[str, Union[str, int]]:
         """Detect available hardware and capabilities."""
@@ -762,7 +761,7 @@ models/optimizers/adaptive_processor.py:24: in __init__
     self.hardware_info = self._detect_hardware()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x79ac4051ba60>
+self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x7ea4b9fcb9d0>
 
     def _detect_hardware(self) -> Dict[str, Union[str, int]]:
         """Detect available hardware and capabilities."""
@@ -803,7 +802,7 @@ models/optimizers/adaptive_processor.py:24: in __init__
     self.hardware_info = self._detect_hardware()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x79ac40003e20>
+self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x7ea4b9f03f40>
 
     def _detect_hardware(self) -> Dict[str, Union[str, int]]:
         """Detect available hardware and capabilities."""
@@ -844,7 +843,7 @@ models/optimizers/adaptive_processor.py:24: in __init__
     self.hardware_info = self._detect_hardware()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x79ac4016bc10>
+self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x7ea4b97bbbb0>
 
     def _detect_hardware(self) -> Dict[str, Union[str, int]]:
         """Detect available hardware and capabilities."""
@@ -885,7 +884,7 @@ models/optimizers/adaptive_processor.py:24: in __init__
     self.hardware_info = self._detect_hardware()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x79ac40f651b0>
+self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x7ea4b9fc9e70>
 
     def _detect_hardware(self) -> Dict[str, Union[str, int]]:
         """Detect available hardware and capabilities."""
@@ -926,7 +925,7 @@ models/optimizers/adaptive_processor.py:24: in __init__
     self.hardware_info = self._detect_hardware()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x79ac401a6e00>
+self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x7ea4b99a61a0>
 
     def _detect_hardware(self) -> Dict[str, Union[str, int]]:
         """Detect available hardware and capabilities."""
@@ -967,7 +966,7 @@ models/optimizers/adaptive_processor.py:24: in __init__
     self.hardware_info = self._detect_hardware()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x79ac401ee500>
+self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x7ea4b98d0ac0>
 
     def _detect_hardware(self) -> Dict[str, Union[str, int]]:
         """Detect available hardware and capabilities."""
@@ -1008,7 +1007,7 @@ models/optimizers/adaptive_processor.py:24: in __init__
     self.hardware_info = self._detect_hardware()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x79ac40195150>
+self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x7ea4b9fca5c0>
 
     def _detect_hardware(self) -> Dict[str, Union[str, int]]:
         """Detect available hardware and capabilities."""
@@ -1049,7 +1048,7 @@ models/optimizers/adaptive_processor.py:24: in __init__
     self.hardware_info = self._detect_hardware()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x79ac4021a770>
+self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x7ea4b9865ff0>
 
     def _detect_hardware(self) -> Dict[str, Union[str, int]]:
         """Detect available hardware and capabilities."""
@@ -1090,7 +1089,7 @@ models/optimizers/adaptive_processor.py:24: in __init__
     self.hardware_info = self._detect_hardware()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x79ac41942860>
+self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x7ea4ba4c5fc0>
 
     def _detect_hardware(self) -> Dict[str, Union[str, int]]:
         """Detect available hardware and capabilities."""
@@ -1122,7 +1121,7 @@ models/optimizers/adaptive_processor.py:24: in __init__
     self.hardware_info = self._detect_hardware()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x79ac40fef850>
+self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x7ea4ba30c850>
 
     def _detect_hardware(self) -> Dict[str, Union[str, int]]:
         """Detect available hardware and capabilities."""
@@ -1154,7 +1153,7 @@ models/optimizers/adaptive_processor.py:24: in __init__
     self.hardware_info = self._detect_hardware()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x79ac4054e4a0>
+self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x7ea4b9866590>
 
     def _detect_hardware(self) -> Dict[str, Union[str, int]]:
         """Detect available hardware and capabilities."""
@@ -1186,7 +1185,7 @@ models/optimizers/adaptive_processor.py:24: in __init__
     self.hardware_info = self._detect_hardware()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x79ac40f67580>
+self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x7ea4b985ca60>
 
     def _detect_hardware(self) -> Dict[str, Union[str, int]]:
         """Detect available hardware and capabilities."""
@@ -1218,7 +1217,7 @@ models/optimizers/adaptive_processor.py:24: in __init__
     self.hardware_info = self._detect_hardware()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x79ac40000520>
+self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x7ea4ba4f6920>
 
     def _detect_hardware(self) -> Dict[str, Union[str, int]]:
         """Detect available hardware and capabilities."""
@@ -1250,7 +1249,7 @@ models/optimizers/adaptive_processor.py:24: in __init__
     self.hardware_info = self._detect_hardware()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x79ac40218ac0>
+self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x7ea4ba30f7c0>
 
     def _detect_hardware(self) -> Dict[str, Union[str, int]]:
         """Detect available hardware and capabilities."""
@@ -1282,7 +1281,7 @@ models/optimizers/adaptive_processor.py:24: in __init__
     self.hardware_info = self._detect_hardware()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x79ac401948b0>
+self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x7ea4ba4a4910>
 
     def _detect_hardware(self) -> Dict[str, Union[str, int]]:
         """Detect available hardware and capabilities."""
@@ -1314,7 +1313,7 @@ models/optimizers/adaptive_processor.py:24: in __init__
     self.hardware_info = self._detect_hardware()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x79ac4016a7d0>
+self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x7ea4b9f02500>
 
     def _detect_hardware(self) -> Dict[str, Union[str, int]]:
         """Detect available hardware and capabilities."""
@@ -1346,7 +1345,7 @@ models/optimizers/adaptive_processor.py:24: in __init__
     self.hardware_info = self._detect_hardware()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x79ac41942740>
+self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x7ea4b98666b0>
 
     def _detect_hardware(self) -> Dict[str, Union[str, int]]:
         """Detect available hardware and capabilities."""
@@ -1378,7 +1377,7 @@ models/optimizers/adaptive_processor.py:24: in __init__
     self.hardware_info = self._detect_hardware()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x79ac40002680>
+self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x7ea4ba4c6d70>
 
     def _detect_hardware(self) -> Dict[str, Union[str, int]]:
         """Detect available hardware and capabilities."""
@@ -1410,7 +1409,7 @@ models/optimizers/adaptive_processor.py:24: in __init__
     self.hardware_info = self._detect_hardware()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x79ac40194dc0>
+self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x7ea4ba30f520>
 
     def _detect_hardware(self) -> Dict[str, Union[str, int]]:
         """Detect available hardware and capabilities."""
@@ -1442,7 +1441,7 @@ models/optimizers/adaptive_processor.py:24: in __init__
     self.hardware_info = self._detect_hardware()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x79ac401a68f0>
+self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x7ea4ba3e0640>
 
     def _detect_hardware(self) -> Dict[str, Union[str, int]]:
         """Detect available hardware and capabilities."""
@@ -1474,7 +1473,7 @@ models/optimizers/adaptive_processor.py:24: in __init__
     self.hardware_info = self._detect_hardware()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x79ac41942170>
+self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x7ea4ba4ded70>
 
     def _detect_hardware(self) -> Dict[str, Union[str, int]]:
         """Detect available hardware and capabilities."""
@@ -1506,7 +1505,7 @@ models/optimizers/adaptive_processor.py:24: in __init__
     self.hardware_info = self._detect_hardware()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x79ac4021b730>
+self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x7ea4b97b8eb0>
 
     def _detect_hardware(self) -> Dict[str, Union[str, int]]:
         """Detect available hardware and capabilities."""
@@ -1538,7 +1537,7 @@ models/optimizers/adaptive_processor.py:24: in __init__
     self.hardware_info = self._detect_hardware()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x79ac4021b8b0>
+self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x7ea4ba4a5060>
 
     def _detect_hardware(self) -> Dict[str, Union[str, int]]:
         """Detect available hardware and capabilities."""
@@ -1558,379 +1557,6 @@ E           AttributeError: 'torch._C._CudaDeviceProperties' object has no attri
 
 models/optimizers/adaptive_processor.py:52: AttributeError
 =================================== FAILURES ===================================
-_________________ TestGraphAttentionLayer.test_attention_mask __________________
-
-self = <tests.generative.test_graph_attention.TestGraphAttentionLayer testMethod=test_attention_mask>
-
-    def test_attention_mask(self):
-        """Test attention masking"""
-        hidden_states = torch.randn(
-            self.batch_size, self.seq_length, self.hidden_size
-        )
-        attention_mask = torch.ones(
-            self.batch_size, self.seq_length
-        )
-        attention_mask[:, 5:] = 0  # Mask out second half of sequence
-    
->       output, attention_probs = self.layer(
-            hidden_states,
-            attention_mask=attention_mask
-        )
-
-tests/generative/test_graph_attention.py:82: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
-../../.local/lib/python3.10/site-packages/torch/nn/modules/module.py:1501: in _call_impl
-    return forward_call(*args, **kwargs)
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
-
-self = GraphAttentionLayer(
-  (query): Linear(in_features=768, out_features=768, bias=True)
-  (key): Linear(in_features=768, ...(output_dropout): Dropout(p=0.1, inplace=False)
-  (layer_norm): LayerNorm((768,), eps=1e-05, elementwise_affine=True)
-)
-hidden_states = tensor([[[ 0.3111, -0.0139, -0.6746,  ..., -0.1453, -0.5056, -1.8921],
-         [ 1.9877, -2.6044, -1.0399,  ...,  0.3...34, -1.4033,  ...,  0.1391, -0.1381, -1.3689],
-         [-0.0631, -1.0588,  0.5692,  ..., -0.7987, -1.9661,  0.4535]]])
-distance_matrix = None, angle_matrix = None
-attention_mask = tensor([[1., 1., 1., 1., 1., 0., 0., 0., 0., 0.],
-        [1., 1., 1., 1., 1., 0., 0., 0., 0., 0.]])
-
-    def forward(
-        self,
-        hidden_states: torch.Tensor,
-        distance_matrix: Optional[torch.Tensor] = None,
-        angle_matrix: Optional[torch.Tensor] = None,
-        attention_mask: Optional[torch.Tensor] = None
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
-        """
-        Forward pass with structure awareness
-    
-        Args:
-            hidden_states: Input tensor [batch_size, seq_length, hidden_size]
-            distance_matrix: Pairwise distances [batch_size, seq_length, seq_length]
-            angle_matrix: Pairwise angles [batch_size, seq_length, seq_length]
-            attention_mask: Attention mask [batch_size, seq_length]
-    
-        Returns:
-            output: Transformed hidden states
-            attention_probs: Attention probabilities
-        """
-        # Linear transformations
-        query_layer = self.transpose_for_scores(self.query(hidden_states))
-        key_layer = self.transpose_for_scores(self.key(hidden_states))
-        value_layer = self.transpose_for_scores(self.value(hidden_states))
-    
-        # Compute base attention scores
-        attention_scores = torch.matmul(query_layer, key_layer.transpose(-1, -2))
-        attention_scores = attention_scores / math.sqrt(self.attention_head_size)
-    
-        # Add structure awareness if available
-        if distance_matrix is not None:
-            distance_embeddings = self.distance_embedding(distance_matrix.unsqueeze(-1))
-            attention_scores = attention_scores + torch.matmul(
-                query_layer, distance_embeddings.transpose(-1, -2)
-            )
-    
-        if angle_matrix is not None:
-            angle_embeddings = self.angle_embedding(angle_matrix.unsqueeze(-1))
-            attention_scores = attention_scores + torch.matmul(
-                query_layer, angle_embeddings.transpose(-1, -2)
-            )
-    
-        # Apply attention mask if provided
-        if attention_mask is not None:
->           attention_scores = attention_scores + (1.0 - attention_mask) * -10000.0
-E           RuntimeError: The size of tensor a (10) must match the size of tensor b (2) at non-singleton dimension 2
-
-models/generative/graph_attention.py:97: RuntimeError
-____________ TestGraphAttentionLayer.test_structure_aware_attention ____________
-
-self = <tests.generative.test_graph_attention.TestGraphAttentionLayer testMethod=test_structure_aware_attention>
-
-    def test_structure_aware_attention(self):
-        """Test forward pass with structural information"""
-        hidden_states = torch.randn(
-            self.batch_size, self.seq_length, self.hidden_size
-        )
-        distance_matrix = torch.randn(
-            self.batch_size, self.seq_length, self.seq_length
-        )
-        angle_matrix = torch.randn(
-            self.batch_size, self.seq_length, self.seq_length
-        )
-    
->       output, attention_probs = self.layer(
-            hidden_states,
-            distance_matrix=distance_matrix,
-            angle_matrix=angle_matrix
-        )
-
-tests/generative/test_graph_attention.py:56: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
-../../.local/lib/python3.10/site-packages/torch/nn/modules/module.py:1501: in _call_impl
-    return forward_call(*args, **kwargs)
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
-
-self = GraphAttentionLayer(
-  (query): Linear(in_features=768, out_features=768, bias=True)
-  (key): Linear(in_features=768, ...(output_dropout): Dropout(p=0.1, inplace=False)
-  (layer_norm): LayerNorm((768,), eps=1e-05, elementwise_affine=True)
-)
-hidden_states = tensor([[[-1.4383,  0.5983,  0.8873,  ...,  0.9666, -0.9052,  0.7819],
-         [-1.0167, -1.1629,  0.8792,  ...,  1.0...55,  0.7182,  ..., -0.5750,  2.4543,  0.1636],
-         [ 0.5990, -1.3894, -0.2408,  ...,  0.9561,  1.3139,  0.5718]]])
-distance_matrix = tensor([[[-1.8358,  0.9523,  1.7551,  1.2981, -0.0264, -0.7436,  0.2069,
-           0.4788,  1.5433,  0.7471],
-       ...3311],
-         [ 0.8001,  1.3855,  1.3462, -1.5763,  1.2805,  0.9770, -0.2002,
-          -1.7443, -0.5874, -1.9181]]])
-angle_matrix = tensor([[[-0.1188, -0.9413, -0.0639,  0.4965,  0.3920, -0.9647, -0.2489,
-          -1.5275, -1.0904,  0.2680],
-       ...0327],
-         [ 0.9884,  0.2325, -0.2962,  1.6318, -1.9254, -0.1742,  0.7571,
-          -1.0639,  1.2278, -0.6918]]])
-attention_mask = None
-
-    def forward(
-        self,
-        hidden_states: torch.Tensor,
-        distance_matrix: Optional[torch.Tensor] = None,
-        angle_matrix: Optional[torch.Tensor] = None,
-        attention_mask: Optional[torch.Tensor] = None
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
-        """
-        Forward pass with structure awareness
-    
-        Args:
-            hidden_states: Input tensor [batch_size, seq_length, hidden_size]
-            distance_matrix: Pairwise distances [batch_size, seq_length, seq_length]
-            angle_matrix: Pairwise angles [batch_size, seq_length, seq_length]
-            attention_mask: Attention mask [batch_size, seq_length]
-    
-        Returns:
-            output: Transformed hidden states
-            attention_probs: Attention probabilities
-        """
-        # Linear transformations
-        query_layer = self.transpose_for_scores(self.query(hidden_states))
-        key_layer = self.transpose_for_scores(self.key(hidden_states))
-        value_layer = self.transpose_for_scores(self.value(hidden_states))
-    
-        # Compute base attention scores
-        attention_scores = torch.matmul(query_layer, key_layer.transpose(-1, -2))
-        attention_scores = attention_scores / math.sqrt(self.attention_head_size)
-    
-        # Add structure awareness if available
-        if distance_matrix is not None:
-            distance_embeddings = self.distance_embedding(distance_matrix.unsqueeze(-1))
->           attention_scores = attention_scores + torch.matmul(
-                query_layer, distance_embeddings.transpose(-1, -2)
-            )
-E           RuntimeError: The size of tensor a (8) must match the size of tensor b (10) at non-singleton dimension 1
-
-models/generative/graph_attention.py:85: RuntimeError
-_________________ TestProteinGenerator.test_concept_alignment __________________
-
-self = <tests.generative.test_protein_generator.TestProteinGenerator testMethod=test_concept_alignment>
-
-    def test_concept_alignment(self):
-        """Test concept alignment evaluation"""
-        current_concepts = {
-            "structure": torch.rand(self.batch_size, self.seq_length, 16, device=self.device),
-            "chemistry": torch.rand(self.batch_size, self.seq_length, 16, device=self.device),
-            "function": torch.rand(self.batch_size, self.seq_length, 16, device=self.device),
-            "interaction": torch.rand(self.batch_size, self.seq_length, 16, device=self.device)
-        }
-    
-        target_concepts = {
-            "structure": torch.tensor([0.8, 0.2, 0.1], device=self.device),
-            "chemistry": torch.tensor([0.6, 0.4, 0.5], device=self.device)
-        }
-    
->       scores = self.model._evaluate_concept_alignment(current_concepts, target_concepts)
-
-tests/generative/test_protein_generator.py:106: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
-
-self = ProteinGenerativeModel(
-  (embeddings): Embedding(25, 768, padding_idx=0)
-  (position_embeddings): Embedding(512, 768)...tures=3072, out_features=3, bias=True)
-  )
-  (output_projection): Linear(in_features=768, out_features=25, bias=True)
-)
-current_concepts = {'chemistry': tensor([[[0.6760, 0.0921, 0.6320,  ..., 0.9045, 0.9870, 0.2197],
-         [0.0109, 0.2958, 0.2653,  ...,...
-         [3.5773e-01, 6.3153e-01, 9.7264e-01,  ..., 3.2043e-01,
-          9.3671e-01, 8.8758e-01]]], device='cuda:0')}
-target_concepts = {'chemistry': tensor([0.6000, 0.4000, 0.5000], device='cuda:0'), 'structure': tensor([0.8000, 0.2000, 0.1000], device='cuda:0')}
-
-    def _evaluate_concept_alignment(
-        self,
-        current_concepts: Dict[str, torch.Tensor],
-        target_concepts: Optional[Dict[str, float]] = None
-    ) -> torch.Tensor:
-        """Evaluate alignment between current and target concepts"""
-        if target_concepts is None:
-            return torch.zeros(
-                current_concepts[list(current_concepts.keys())[0]].size(0),
-                device=self.device
-            )
-    
-        alignment_scores = []
-        for concept_type, target_value in target_concepts.items():
-            if concept_type in current_concepts:
-                current_value = current_concepts[concept_type].to(self.device)
-                target_tensor = torch.tensor(target_value, device=self.device)
-                # Calculate similarity between current and target concept values
->               diff = torch.abs(current_value - target_tensor)
-E               RuntimeError: The size of tensor a (16) must match the size of tensor b (3) at non-singleton dimension 2
-
-models/generative/protein_generator.py:666: RuntimeError
-____________________ TestProteinGenerator.test_forward_pass ____________________
-
-self = <tests.generative.test_protein_generator.TestProteinGenerator testMethod=test_forward_pass>
-
-    def test_forward_pass(self):
-        """Test forward pass with concept bottleneck"""
->       outputs = self.model(
-            input_ids=self.input_ids,
-            output_attentions=True,
-            output_hidden_states=True,
-            return_concepts=True
-        )
-
-tests/generative/test_protein_generator.py:31: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
-../../.local/lib/python3.10/site-packages/torch/nn/modules/module.py:1501: in _call_impl
-    return forward_call(*args, **kwargs)
-models/generative/protein_generator.py:374: in forward
-    aa_indices = torch.tensor([[self.aa_to_idx[self.idx_to_aa[id.item()]]
-models/generative/protein_generator.py:374: in <listcomp>
-    aa_indices = torch.tensor([[self.aa_to_idx[self.idx_to_aa[id.item()]]
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
-
-.0 = <tuple_iterator object at 0x79ac40247370>
-
->   aa_indices = torch.tensor([[self.aa_to_idx[self.idx_to_aa[id.item()]]
-                              for id in seq] for seq in input_ids], device=device)
-E   KeyError: 24
-
-models/generative/protein_generator.py:374: KeyError
-_______________ TestProteinGenerator.test_generate_with_concepts _______________
-
-self = <tests.generative.test_protein_generator.TestProteinGenerator testMethod=test_generate_with_concepts>
-
-    def test_generate_with_concepts(self):
-        """Test protein generation with concept guidance"""
-        prompt_text = "Generate a stable alpha-helical protein"
-        target_concepts = {
-            "structure": torch.tensor([0.8, 0.2, 0.1], device=self.device),  # Alpha helix preference
-            "chemistry": torch.tensor([0.6, 0.4, 0.5], device=self.device),
-            "function": torch.tensor([0.7, 0.3, 0.4], device=self.device),
-            "interaction": torch.tensor([0.5, 0.5, 0.5], device=self.device)
-        }
-    
->       sequences = self.model.generate(
-            prompt_text=prompt_text,
-            max_length=32,
-            num_return_sequences=2,
-            temperature=0.8,
-            concept_guidance=True,
-            target_concepts=target_concepts
-        )
-
-tests/generative/test_protein_generator.py:63: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
-models/generative/protein_generator.py:526: in generate
-    encoded = self.tokenizer(prompt_text, return_tensors="pt").to(device)
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
-
-self = ProteinGenerativeModel(
-  (embeddings): Embedding(25, 768, padding_idx=0)
-  (position_embeddings): Embedding(512, 768)...tures=3072, out_features=3, bias=True)
-  )
-  (output_projection): Linear(in_features=768, out_features=25, bias=True)
-)
-name = 'tokenizer'
-
-    def __getattr__(self, name: str) -> Union[Tensor, 'Module']:
-        if '_parameters' in self.__dict__:
-            _parameters = self.__dict__['_parameters']
-            if name in _parameters:
-                return _parameters[name]
-        if '_buffers' in self.__dict__:
-            _buffers = self.__dict__['_buffers']
-            if name in _buffers:
-                return _buffers[name]
-        if '_modules' in self.__dict__:
-            modules = self.__dict__['_modules']
-            if name in modules:
-                return modules[name]
->       raise AttributeError("'{}' object has no attribute '{}'".format(
-            type(self).__name__, name))
-E       AttributeError: 'ProteinGenerativeModel' object has no attribute 'tokenizer'
-
-../../.local/lib/python3.10/site-packages/torch/nn/modules/module.py:1614: AttributeError
-_______________ TestProteinGenerator.test_structural_validation ________________
-
-self = <tests.generative.test_protein_generator.TestProteinGenerator testMethod=test_structural_validation>
-
-    def test_structural_validation(self):
-        """Test structural validation during generation"""
-        angles = torch.randn(self.batch_size, self.seq_length, 3, device=self.device)
-        scores = self.model._evaluate_structural_validity(angles)
-    
-        # Check score shape and range
->       self.assertEqual(scores.shape, (self.batch_size,))
-E       AssertionError: torch.Size([4, 16]) != (4,)
-
-tests/generative/test_protein_generator.py:88: AssertionError
-_________________ TestProteinGenerator.test_template_guidance __________________
-
-self = <tests.generative.test_protein_generator.TestProteinGenerator testMethod=test_template_guidance>
-
-    def test_template_guidance(self):
-        """Test template-guided generation"""
-        template_sequence = "MLKFVAVVVL"
->       sequences = self.model.generate(
-            prompt_text="Generate a protein similar to the template",
-            max_length=32,
-            num_return_sequences=2,
-            template_sequence=template_sequence
-        )
-
-tests/generative/test_protein_generator.py:116: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
-models/generative/protein_generator.py:526: in generate
-    encoded = self.tokenizer(prompt_text, return_tensors="pt").to(device)
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
-
-self = ProteinGenerativeModel(
-  (embeddings): Embedding(25, 768, padding_idx=0)
-  (position_embeddings): Embedding(512, 768)...tures=3072, out_features=3, bias=True)
-  )
-  (output_projection): Linear(in_features=768, out_features=25, bias=True)
-)
-name = 'tokenizer'
-
-    def __getattr__(self, name: str) -> Union[Tensor, 'Module']:
-        if '_parameters' in self.__dict__:
-            _parameters = self.__dict__['_parameters']
-            if name in _parameters:
-                return _parameters[name]
-        if '_buffers' in self.__dict__:
-            _buffers = self.__dict__['_buffers']
-            if name in _buffers:
-                return _buffers[name]
-        if '_modules' in self.__dict__:
-            modules = self.__dict__['_modules']
-            if name in modules:
-                return modules[name]
->       raise AttributeError("'{}' object has no attribute '{}'".format(
-            type(self).__name__, name))
-E       AttributeError: 'ProteinGenerativeModel' object has no attribute 'tokenizer'
-
-../../.local/lib/python3.10/site-packages/torch/nn/modules/module.py:1614: AttributeError
 ________________ TestStructureAwareGenerator.test_gradient_flow ________________
 
 self = <tests.generative.test_structure_generator.TestStructureAwareGenerator testMethod=test_gradient_flow>
@@ -1954,93 +1580,6 @@ self = <tests.generative.test_structure_generator.TestStructureAwareGenerator te
 E               AssertionError: unexpectedly None
 
 tests/generative/test_structure_generator.py:135: AssertionError
-_________ TestStructureAwareGenerator.test_structure_aware_generation __________
-
-self = <tests.generative.test_structure_generator.TestStructureAwareGenerator testMethod=test_structure_aware_generation>
-
-    def test_structure_aware_generation(self):
-        """Test forward pass with structural information"""
-        input_ids = torch.randint(0, 22, (self.batch_size, self.seq_length))
-        distance_matrix = torch.randn(
-            self.batch_size, self.seq_length, self.seq_length
-        )
-        angle_matrix = torch.randn(
-            self.batch_size, self.seq_length, self.seq_length
-        )
-    
->       outputs = self.generator(
-            input_ids,
-            distance_matrix=distance_matrix,
-            angle_matrix=angle_matrix
-        )
-
-tests/generative/test_structure_generator.py:59: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
-../../.local/lib/python3.10/site-packages/torch/nn/modules/module.py:1501: in _call_impl
-    return forward_call(*args, **kwargs)
-models/generative/structure_generator.py:106: in forward
-    layer_output, attn_weights = attention_layer(
-../../.local/lib/python3.10/site-packages/torch/nn/modules/module.py:1501: in _call_impl
-    return forward_call(*args, **kwargs)
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
-
-self = GraphAttentionLayer(
-  (query): Linear(in_features=768, out_features=768, bias=True)
-  (key): Linear(in_features=768, ...(output_dropout): Dropout(p=0.1, inplace=False)
-  (layer_norm): LayerNorm((768,), eps=1e-05, elementwise_affine=True)
-)
-hidden_states = tensor([[[ 0.4553, -0.2541,  0.3995,  ..., -0.0000, -0.3704,  0.4796],
-         [ 2.2243, -2.3845, -1.7914,  ..., -0.0...2747,  0.4804],
-         [-3.1200, -0.5672, -0.0000,  ...,  0.1784,  1.4895, -0.0324]]],
-       grad_fn=<MulBackward0>)
-distance_matrix = tensor([[[ 5.7445e-01,  5.2147e-01,  1.5548e-01,  6.4518e-01, -1.1406e+00,
-          -1.6512e+00, -1.4599e-01,  2.7386...1, -6.6691e-01,  1.2058e+00,  1.5985e+00,
-          -1.6347e-01,  1.3332e+00,  1.6939e-01,  7.6006e-02,  5.2039e-01]]])
-angle_matrix = tensor([[[-0.6834, -0.8439,  0.8246,  1.2798, -0.3257,  0.0226, -1.8679,
-           1.8525,  0.7190,  0.5906],
-       ...6108],
-         [ 0.0909, -0.5146, -0.4015,  0.1248, -1.2827,  1.4582,  0.3400,
-           0.2311, -0.9046, -0.9775]]])
-attention_mask = None
-
-    def forward(
-        self,
-        hidden_states: torch.Tensor,
-        distance_matrix: Optional[torch.Tensor] = None,
-        angle_matrix: Optional[torch.Tensor] = None,
-        attention_mask: Optional[torch.Tensor] = None
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
-        """
-        Forward pass with structure awareness
-    
-        Args:
-            hidden_states: Input tensor [batch_size, seq_length, hidden_size]
-            distance_matrix: Pairwise distances [batch_size, seq_length, seq_length]
-            angle_matrix: Pairwise angles [batch_size, seq_length, seq_length]
-            attention_mask: Attention mask [batch_size, seq_length]
-    
-        Returns:
-            output: Transformed hidden states
-            attention_probs: Attention probabilities
-        """
-        # Linear transformations
-        query_layer = self.transpose_for_scores(self.query(hidden_states))
-        key_layer = self.transpose_for_scores(self.key(hidden_states))
-        value_layer = self.transpose_for_scores(self.value(hidden_states))
-    
-        # Compute base attention scores
-        attention_scores = torch.matmul(query_layer, key_layer.transpose(-1, -2))
-        attention_scores = attention_scores / math.sqrt(self.attention_head_size)
-    
-        # Add structure awareness if available
-        if distance_matrix is not None:
-            distance_embeddings = self.distance_embedding(distance_matrix.unsqueeze(-1))
->           attention_scores = attention_scores + torch.matmul(
-                query_layer, distance_embeddings.transpose(-1, -2)
-            )
-E           RuntimeError: The size of tensor a (8) must match the size of tensor b (10) at non-singleton dimension 1
-
-models/generative/graph_attention.py:85: RuntimeError
 _________ TestStructureAwareGenerator.test_structure_guided_generation _________
 
 self = <tests.generative.test_structure_generator.TestStructureAwareGenerator testMethod=test_structure_guided_generation>
@@ -2079,18 +1618,20 @@ self = GraphAttentionLayer(
   (key): Linear(in_features=768, ...(output_dropout): Dropout(p=0.1, inplace=False)
   (layer_norm): LayerNorm((768,), eps=1e-05, elementwise_affine=True)
 )
-hidden_states = tensor([[[-0.7336,  1.9169, -1.6075,  ...,  1.6450, -0.1947,  0.0000],
-         [ 1.8787,  0.5411,  0.2550,  ...,  1.7...6835,  0.3195],
-         [ 1.3419,  2.4740, -0.5156,  ...,  1.2989, -1.6661,  1.3301]]],
+hidden_states = tensor([[[-0.2133, -1.5019,  0.2690,  ...,  0.5587, -0.1340,  0.0178],
+         [ 1.5458,  0.0522, -1.1695,  ..., -1.4...4574,  0.0000],
+         [ 2.0462, -0.0829, -0.1333,  ..., -0.0000, -1.5385, -1.1402]]],
        grad_fn=<MulBackward0>)
-distance_matrix = tensor([[[-5.3764e-01,  3.5464e-01,  1.8831e+00, -1.4575e+00, -6.3030e-01,
-          -5.9948e-02,  1.3306e+00, -8.1322...1,  3.3655e-01,  2.9710e-01,  4.8404e-01,
-          -1.4319e-01, -4.5576e-01,  3.3216e-01, -7.0132e-01, -1.2308e+00]]])
-angle_matrix = tensor([[[ 0.0285,  1.5114, -0.2706,  0.8138,  0.4157, -0.1835, -0.9876,
-          -2.0641, -1.2857,  0.4450],
-       ...2184],
-         [-0.4898, -0.7384, -0.5852, -1.8471, -0.4121,  0.4415, -0.6048,
-           0.9039, -0.1219, -0.7810]]])
+distance_matrix = tensor([[[-0.3261, -0.9820,  1.0624, -1.2498,  0.1626, -0.1744,  0.6472,
+           0.3154, -0.0772, -0.2846],
+       ...3828],
+         [ 0.4845, -2.5501,  1.0480, -0.4265,  1.1760, -1.1217, -0.8001,
+           0.3470, -2.9748,  0.3945]]])
+angle_matrix = tensor([[[-0.5184, -1.4005, -0.7356, -0.1590,  0.4107,  0.4992, -1.2366,
+          -2.0018, -0.1628, -0.5798],
+       ...5004],
+         [-0.6421,  0.7192, -0.9510,  1.5766, -1.2018, -0.5078, -0.5575,
+           0.6103,  0.3236, -0.6996]]])
 attention_mask = None
 
     def forward(
@@ -2124,13 +1665,22 @@ attention_mask = None
     
         # Add structure awareness if available
         if distance_matrix is not None:
+            # Get distance embeddings [batch_size, seq_length, seq_length, 1]
             distance_embeddings = self.distance_embedding(distance_matrix.unsqueeze(-1))
->           attention_scores = attention_scores + torch.matmul(
-                query_layer, distance_embeddings.transpose(-1, -2)
-            )
-E           RuntimeError: The size of tensor a (8) must match the size of tensor b (10) at non-singleton dimension 1
+    
+            # Project embeddings to attention head size
+            batch_size, seq_len_i, seq_len_j, embed_dim = distance_embeddings.size()
+    
+            # Reshape to match attention scores: [batch_size, num_heads, seq_len, seq_len]
+            distance_scores = distance_embeddings.squeeze(-1)  # Remove last dimension
+            distance_scores = distance_scores.unsqueeze(1)     # Add head dimension
+            distance_scores = distance_scores.expand(-1, self.num_attention_heads, -1, -1)
+    
+            # Add to attention scores
+>           attention_scores = attention_scores + distance_scores
+E           RuntimeError: The size of tensor a (2) must match the size of tensor b (10) at non-singleton dimension 3
 
-models/generative/graph_attention.py:85: RuntimeError
+models/generative/graph_attention.py:96: RuntimeError
 _____________________ test_different_latency_targets[0.1] ______________________
 
 target_latency = 0.1
@@ -2147,7 +1697,7 @@ models/optimizers/adaptive_processor.py:24: in __init__
     self.hardware_info = self._detect_hardware()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x79ac401bffa0>
+self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x7ea4ba30d540>
 
     def _detect_hardware(self) -> Dict[str, Union[str, int]]:
         """Detect available hardware and capabilities."""
@@ -2182,7 +1732,7 @@ models/optimizers/adaptive_processor.py:24: in __init__
     self.hardware_info = self._detect_hardware()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x79ac40169a50>
+self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x7ea4ba4f47f0>
 
     def _detect_hardware(self) -> Dict[str, Union[str, int]]:
         """Detect available hardware and capabilities."""
@@ -2217,7 +1767,7 @@ models/optimizers/adaptive_processor.py:24: in __init__
     self.hardware_info = self._detect_hardware()
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
-self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x79ac4054c910>
+self = <models.optimizers.adaptive_processor.AdaptiveProcessor object at 0x7ea4ba4df670>
 
     def _detect_hardware(self) -> Dict[str, Union[str, int]]:
         """Detect available hardware and capabilities."""
@@ -2238,8 +1788,8 @@ E           AttributeError: 'torch._C._CudaDeviceProperties' object has no attri
 models/optimizers/adaptive_processor.py:52: AttributeError
 ____________________________ test_log_file_creation ____________________________
 
-performance_monitor = <models.optimizers.performance_monitor.PerformanceMonitor object at 0x79ac40ffdc60>
-temp_log_dir = '/tmp/tmpc5k4hq1j'
+performance_monitor = <models.optimizers.performance_monitor.PerformanceMonitor object at 0x7ea4b9860820>
+temp_log_dir = '/tmp/tmpi8u86p6m'
 
     def test_log_file_creation(performance_monitor, temp_log_dir):
         """Test log file creation and writing."""
@@ -2252,9 +1802,9 @@ temp_log_dir = '/tmp/tmpc5k4hq1j'
         # Check log file content
 >       assert log_file.stat().st_size > 0
 E       AssertionError: assert 0 > 0
-E        +  where 0 = os.stat_result(st_mode=33204, st_ino=5767332, st_dev=66306, st_nlink=1, st_uid=1000, st_gid=1000, st_size=0, st_atime=1734453747, st_mtime=1734453747, st_ctime=1734453747).st_size
-E        +    where os.stat_result(st_mode=33204, st_ino=5767332, st_dev=66306, st_nlink=1, st_uid=1000, st_gid=1000, st_size=0, st_atime=1734453747, st_mtime=1734453747, st_ctime=1734453747) = stat()
-E        +      where stat = PosixPath('/tmp/tmpc5k4hq1j/performance.log').stat
+E        +  where 0 = os.stat_result(st_mode=33204, st_ino=5511093, st_dev=66306, st_nlink=1, st_uid=1000, st_gid=1000, st_size=0, st_atime=1734524627, st_mtime=1734524627, st_ctime=1734524627).st_size
+E        +    where os.stat_result(st_mode=33204, st_ino=5511093, st_dev=66306, st_nlink=1, st_uid=1000, st_gid=1000, st_size=0, st_atime=1734524627, st_mtime=1734524627, st_ctime=1734524627) = stat()
+E        +      where stat = PosixPath('/tmp/tmpi8u86p6m/performance.log').stat
 
 tests/optimizers/test_performance_monitor.py:204: AssertionError
 =============================== warnings summary ===============================
@@ -2278,10 +1828,6 @@ tests/analysis/test_multimodal_integration.py::test_cross_modal_attention
 tests/analysis/test_multimodal_integration.py::test_confidence_estimation
   /home/kasinadhsarma/.local/lib/python3.10/site-packages/huggingface_hub/file_download.py:797: FutureWarning: `resume_download` is deprecated and will be removed in version 1.0.0. Downloads always resume when possible. If you want to force a new download, use `force_download=True`.
     warnings.warn(
-
-tests/generative/test_protein_generator.py::TestProteinGenerator::test_concept_alignment
-  /home/kasinadhsarma/Pictures/ProtienFlex/models/generative/protein_generator.py:664: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
-    target_tensor = torch.tensor(target_value, device=self.device)
 
 tests/optimizers/test_memory_manager.py::test_checkpoint_sequential
   /home/kasinadhsarma/.local/lib/python3.10/site-packages/torch/utils/checkpoint.py:31: UserWarning: None of the inputs have requires_grad=True. Gradients will be None
@@ -2332,18 +1878,10 @@ ERROR tests/optimizers/test_adaptive_processor.py::test_different_batch_sizes[1]
 ERROR tests/optimizers/test_adaptive_processor.py::test_different_batch_sizes[2]
 ERROR tests/optimizers/test_adaptive_processor.py::test_different_batch_sizes[4]
 ERROR tests/optimizers/test_adaptive_processor.py::test_layer_optimization - ...
-FAILED tests/generative/test_graph_attention.py::TestGraphAttentionLayer::test_attention_mask
-FAILED tests/generative/test_graph_attention.py::TestGraphAttentionLayer::test_structure_aware_attention
-FAILED tests/generative/test_protein_generator.py::TestProteinGenerator::test_concept_alignment
-FAILED tests/generative/test_protein_generator.py::TestProteinGenerator::test_forward_pass
-FAILED tests/generative/test_protein_generator.py::TestProteinGenerator::test_generate_with_concepts
-FAILED tests/generative/test_protein_generator.py::TestProteinGenerator::test_structural_validation
-FAILED tests/generative/test_protein_generator.py::TestProteinGenerator::test_template_guidance
 FAILED tests/generative/test_structure_generator.py::TestStructureAwareGenerator::test_gradient_flow
-FAILED tests/generative/test_structure_generator.py::TestStructureAwareGenerator::test_structure_aware_generation
 FAILED tests/generative/test_structure_generator.py::TestStructureAwareGenerator::test_structure_guided_generation
 FAILED tests/optimizers/test_adaptive_processor.py::test_different_latency_targets[0.1]
 FAILED tests/optimizers/test_adaptive_processor.py::test_different_latency_targets[0.5]
 FAILED tests/optimizers/test_adaptive_processor.py::test_different_latency_targets[1.0]
 FAILED tests/optimizers/test_performance_monitor.py::test_log_file_creation
-======= 14 failed, 82 passed, 11 warnings, 40 errors in 72.41s (0:01:12) =======
+======= 6 failed, 90 passed, 10 warnings, 40 errors in 85.14s (0:01:25) ========
