@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Flexible Protein 3D Visualization</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: 'Inter', sans-serif; background-color: #1f2937; /* bg-gray-800 */ color: #f3f4f6; /* text-gray-100 */ }
+        #container { width: 100vw; height: 100vh; display: block; cursor: pointer; /* Indicate interactivity */ }
+        canvas { display: block; }
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            display: flex;
+            gap: 10px;
+            background-color: rgba(31, 41, 55, 0.8); /* bg-gray-800 with opacity */
+            padding: 10px 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            background-color: #3b82f6; /* bg-blue-500 */
+            color: white;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        button:hover {
+            background-color: #2563eb; /* bg-blue-600 */
+        }
+        button:disabled {
+            background-color: #9ca3af; /* bg-gray-400 */
+            cursor: not-allowed;
+        }
+        #messageBox {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(239, 68, 68, 0.9); /* bg-red-500 */
+            color: white;
+            padding: 10px 20px;
+            border-radius: 6px;
+            display: none; /* Hidden by default */
+            z-index: 20;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    <div id="controls">
+        <button id="toggleAnimationBtn">Stop Animation</button>
+        </div>
+    <div id="messageBox">WebGL is not supported or disabled.</div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        let scene, camera, renderer, proteinGroup;
+        let animationRunning = true;
+        let clock = new THREE.Clock();
+        let raycaster = new THREE.Raycaster(); // Added for interaction
+        let pointer = new THREE.Vector2(); // Added for interaction (stores mouse/touch coordinates)
+        let intersectedObject = null; // Keep track of the currently highlighted object
+        const originalSphereColor = 0x3b82f6; // Store original color
+        const highlightColor = 0xffa500; // Orange highlight color
+
+        // --- Initialization ---
+        function init() {
+            const container = document.getElementById('container');
+            if (!container) {
+                console.error("Container element not found!");
+                return;
+            }
+
+            // Basic WebGL Support Check
+            if (!window.WebGLRenderingContext) {
+                document.getElementById('messageBox').style.display = 'block';
+                return;
+            }
+            try {
+                 const canvas = document.createElement('canvas');
+                 const context = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+                 if (!context) throw new Error('WebGL context creation failed');
+            } catch (e) {
+                 document.getElementById('messageBox').innerText = 'Error initializing WebGL. Your browser might not support it.';
+                 document.getElementById('messageBox').style.display = 'block';
+                 console.error("WebGL initialization failed:", e);
+                 return;
+            }
+
+            // Scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x1f2937); // Match body background
+
+            // Camera
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.z = 30;
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            container.appendChild(renderer.domElement);
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0xcccccc, 0.6);
+            scene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.9);
+            directionalLight.position.set(5, 10, 7.5);
+            scene.add(directionalLight);
+
+            // Protein Group
+            proteinGroup = new THREE.Group();
+            scene.add(proteinGroup);
+
+            // Create the protein structure
+            createProteinChain(20, 2); // 20 segments, radius 2
+
+            // Event Listeners
+            window.addEventListener('resize', onWindowResize, false);
+            document.getElementById('toggleAnimationBtn').addEventListener('click', toggleAnimation);
+            // Interaction Listeners (listen on the renderer's canvas)
+            renderer.domElement.addEventListener('pointerdown', onPointerDown, false); // Use pointerdown for both mouse/touch
+
+            // Start Animation Loop
+            animate();
+        }
+
+        // --- Protein Creation ---
+        function createProteinChain(numSegments, radius) {
+            const sphereGeometry = new THREE.SphereGeometry(0.5, 32, 16);
+            const sphereMaterial = new THREE.MeshPhongMaterial({ color: originalSphereColor, shininess: 50 });
+            const bondMaterial = new THREE.MeshPhongMaterial({ color: 0x6b7280, shininess: 30 });
+
+            let previousSphereMesh = null; // Keep track of the previous sphere *mesh*
+
+            for (let i = 0; i < numSegments; i++) {
+                const angle = (i / numSegments) * Math.PI * 4;
+                const x = Math.cos(angle) * radius;
+                const z = Math.sin(angle) * radius;
+                const y = (i - numSegments / 2) * 1.0;
+                const position = new THREE.Vector3(x, y, z);
+
+                // Create Sphere
+                const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial.clone()); // Clone material
+                sphere.position.copy(position);
+                sphere.userData = { // Store relevant data directly in userData
+                    originalY: y,
+                    index: i,
+                    type: 'sphere', // Identify object type for raycasting
+                    originalColor: sphere.material.color.clone(), // Store original color instance
+                    previousSphere: null, // Will link later
+                    nextSphere: null // Will link later
+                };
+                proteinGroup.add(sphere);
+
+                 // Link spheres for neighbour highlighting
+                if (previousSphereMesh) {
+                    sphere.userData.previousSphere = previousSphereMesh;
+                    previousSphereMesh.userData.nextSphere = sphere;
+                }
+
+
+                // Create Bond
+                if (previousSphereMesh) {
+                    const prevPosition = previousSphereMesh.position;
+                    const direction = new THREE.Vector3().subVectors(position, prevPosition);
+                    const distance = direction.length();
+                    const cylinderGeometry = new THREE.CylinderGeometry(0.15, 0.15, distance, 8);
+                    const bond = new THREE.Mesh(cylinderGeometry, bondMaterial);
+                    bond.position.copy(prevPosition).add(direction.multiplyScalar(0.5));
+                    bond.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
+                    bond.userData.type = 'bond'; // Identify object type
+                    proteinGroup.add(bond);
+
+                    // Store references to bonds on the spheres for easier animation updates
+                    sphere.userData.previousBond = bond;
+                    previousSphereMesh.userData.nextBond = bond;
+                }
+
+                previousSphereMesh = sphere; // Update for the next iteration
+            }
+            proteinGroup.position.y = 0;
+        }
+
+
+        // --- Animation ---
+        function animate() {
+            // Decide whether to continue based on animationRunning flag
+            if (animationRunning) {
+                 requestAnimationFrame(animate); // Request next frame only if running
+            }
+
+            const delta = clock.getDelta(); // Get time delta even if paused, for smooth restart
+            const elapsedTime = clock.getElapsedTime();
+
+            // 1. Automatic Rotation (Always happens if init was successful)
+            if (proteinGroup) { // Check if proteinGroup exists
+                 proteinGroup.rotation.y += 0.005;
+                 proteinGroup.rotation.x += 0.002;
+            }
+
+
+            // 2. Flexing Animation (Only if animationRunning is true)
+            if (animationRunning && proteinGroup) {
+                proteinGroup.children.forEach(child => {
+                    // Animate Spheres
+                    if (child.userData.type === 'sphere' && child.userData.originalY !== undefined) {
+                        const originalY = child.userData.originalY;
+                        const index = child.userData.index || 0;
+                        const flexAmount = 0.5;
+                        const flexSpeed = 1.5;
+                        const waveOffset = index * 0.3;
+                        child.position.y = originalY + Math.sin(elapsedTime * flexSpeed + waveOffset) * flexAmount;
+                    }
+                });
+
+                 // Animate Bonds (Update position, orientation, and scale based on connected spheres)
+                 proteinGroup.children.forEach(child => {
+                    if (child.userData.type === 'sphere') {
+                         // Update the bond connecting *to* this sphere (previousBond)
+                         if (child.userData.previousBond && child.userData.previousSphere) {
+                             updateBond(child.userData.previousBond, child.userData.previousSphere, child);
+                         }
+                         // Note: The bond connecting *from* this sphere (nextBond)
+                         // will be updated when the *next* sphere is processed.
+                    }
+                 });
+            }
+
+            // Render the scene (Always render to show rotation even if paused)
+             if (renderer && scene && camera) { // Check if essentials exist
+                renderer.render(scene, camera);
+             }
+        }
+
+        // --- Helper function to update a bond ---
+        function updateBond(bond, sphereA, sphereB) {
+            const posA = sphereA.position;
+            const posB = sphereB.position;
+            const direction = new THREE.Vector3().subVectors(posB, posA);
+            const distance = direction.length();
+
+            // Update bond position (midpoint)
+            bond.position.copy(posA).add(direction.clone().multiplyScalar(0.5));
+            // Update bond orientation
+            bond.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
+            // Update bond length via scaling
+            bond.scale.y = distance / bond.geometry.parameters.height;
+        }
+
+
+        // --- Event Handlers ---
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function toggleAnimation() {
+            animationRunning = !animationRunning;
+            const button = document.getElementById('toggleAnimationBtn');
+            if (animationRunning) {
+                button.textContent = 'Stop Animation';
+                clock.start();
+                animate(); // Crucial: Restart the animation loop if it was stopped
+            } else {
+                button.textContent = 'Start Animation';
+                clock.stop();
+                // No need to call requestAnimationFrame here, the loop will stop by itself
+            }
+        }
+
+        // --- Interaction Handling ---
+        function onPointerDown(event) {
+            // Calculate pointer position in normalized device coordinates (-1 to +1)
+            pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
+            pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            // Update the picking ray with the camera and pointer position
+            raycaster.setFromCamera(pointer, camera);
+
+            // Calculate objects intersecting the picking ray
+            // Filter to only check spheres within the proteinGroup
+            const intersects = raycaster.intersectObjects(proteinGroup.children.filter(c => c.userData.type === 'sphere'));
+
+            if (intersects.length > 0) {
+                // An object was hit!
+                const firstHit = intersects[0].object;
+
+                // Avoid re-triggering highlight on the same object rapidly
+                if (intersectedObject !== firstHit) {
+                    // If another object was previously highlighted, revert it first
+                    if (intersectedObject) {
+                         revertHighlight(intersectedObject);
+                         if (intersectedObject.userData.previousSphere) revertHighlight(intersectedObject.userData.previousSphere);
+                         if (intersectedObject.userData.nextSphere) revertHighlight(intersectedObject.userData.nextSphere);
+                    }
+
+                    intersectedObject = firstHit; // Store the new intersected object
+                    applyHighlight(intersectedObject); // Highlight the clicked sphere
+
+                    // Highlight neighbours
+                    if (intersectedObject.userData.previousSphere) {
+                        applyHighlight(intersectedObject.userData.previousSphere);
+                    }
+                     if (intersectedObject.userData.nextSphere) {
+                        applyHighlight(intersectedObject.userData.nextSphere);
+                    }
+
+                    // Set a timeout to automatically revert the highlight
+                    setTimeout(() => {
+                        if(intersectedObject) { // Check if it hasn't been cleared by another click
+                            revertHighlight(intersectedObject);
+                             if (intersectedObject.userData.previousSphere) revertHighlight(intersectedObject.userData.previousSphere);
+                             if (intersectedObject.userData.nextSphere) revertHighlight(intersectedObject.userData.nextSphere);
+                             intersectedObject = null; // Clear the intersected object after timeout
+                        }
+                    }, 500); // Highlight duration: 500ms
+                }
+            } else {
+                 // Clicked on empty space - revert any existing highlight immediately
+                 if (intersectedObject) {
+                     revertHighlight(intersectedObject);
+                     if (intersectedObject.userData.previousSphere) revertHighlight(intersectedObject.userData.previousSphere);
+                     if (intersectedObject.userData.nextSphere) revertHighlight(intersectedObject.userData.nextSphere);
+                     intersectedObject = null;
+                 }
+            }
+        }
+
+        // --- Highlight Functions ---
+        function applyHighlight(sphere) {
+             if (sphere && sphere.material) {
+                sphere.material.color.setHex(highlightColor);
+             }
+        }
+
+        function revertHighlight(sphere) {
+             if (sphere && sphere.material && sphere.userData.originalColor) {
+                 sphere.material.color.copy(sphere.userData.originalColor); // Revert to its specific original color
+             }
+        }
+
+
+        // --- Start ---
+        // Make sure init() is called only once the DOM is ready
+        if (document.readyState === 'loading') { // Loading hasn't finished yet
+            document.addEventListener('DOMContentLoaded', init);
+        } else { // `DOMContentLoaded` has already fired
+            init();
+        }
+
+    </script>
+</body>
+</html>
